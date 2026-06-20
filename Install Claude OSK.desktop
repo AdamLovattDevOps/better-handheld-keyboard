@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Install Claude OSK Keyboard
+Comment=One-click setup for the Claude on-screen keyboard
+Icon=input-keyboard
+Terminal=true
+Exec=bash -c 'f="%k"; f="${f#file://}"; cd "$(dirname "$f")" && chmod +x ./install.sh ./bin/* 2>/dev/null; ./install.sh; echo; read -rp "Press Enter to close."'
+Categories=Utility;System;

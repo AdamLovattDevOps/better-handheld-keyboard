@@ -19,11 +19,20 @@ GLib.set_prgname("claude-osk")   # app_id so the KWin window-rule can match us
 
 CFG_DIR = os.path.expanduser("~/.config/claude-osk")
 
+# Game Mode (gamescope): render as a transparent, input-capable external overlay
+# instead of a KWin window. Enabled by the daemon when it detects gamescope.
+GAMEMODE = os.environ.get("CLAUDE_KBD_GAMEMODE") == "1"
+GS_DISPLAY = os.environ.get("CLAUDE_KBD_GS_DISPLAY", os.environ.get("DISPLAY", ":0"))
+
 DEFAULT_CONFIG = {
     "layout": "full", "locale": "auto", "opacity": 0.72,
     "geometry": {"x": 0, "y": 378, "w": 1280, "h": 422},
     "key_size": [74, 64], "wide_size": [110, 64], "space_width": 360,
     "key_settle_ms": 20,
+    # global hotkey to toggle the keyboard (evdev key names, pressed together).
+    # [] disables it. Works regardless of focus. Needs read access to /dev/input
+    # (the installer's udev rule + 'input' group grant this).
+    "hotkey": ["KEY_LEFTCTRL", "KEY_LEFTALT", "KEY_K"],
     "theme": {
         "window_bg": "#161616", "key_bg": "#333333", "key_fg": "#f5f5f5",
         "key_border": "#0d0d0d", "key_active": "#3daee9",
@@ -97,7 +106,11 @@ def active_layout_code():
 
 def resolve_locale(config):
     loc = config.get("locale", "auto")
-    return active_layout_code() if loc == "auto" else loc
+    if loc != "auto":
+        return loc
+    if GAMEMODE:
+        return "us"          # no KDE in Game Mode — skip the DBus/kreadconfig probe
+    return active_layout_code()
 
 
 def resolve_rows(layout):
@@ -131,6 +144,8 @@ button:active {{ background: {t['key_active']}; }}
 button.mod-on {{ background: {t['mod_on_bg']}; color: {t['mod_on_fg']}; font-weight: bold;
                 border: 3px solid {t['mod_on_border']}; }}
 button.special {{ background: {t['special_bg']}; color: {t['special_fg']}; }}
+window.gm {{ background-color: rgba(0,0,0,0); }}
+.gm-keys {{ background-color: rgba(12,12,12,0.82); }}
 """.encode()
 
 
@@ -183,7 +198,23 @@ class OSK(Gtk.Window):
                     self.keybtns.append((b, name, label, shifted))
                 hb.pack_start(b, exp, exp, 0)
             grid.pack_start(hb, False, False, 0)
-        self.add(grid)
+        self.orig_touch_mode = None
+        if GAMEMODE:
+            # Transparent fullscreen overlay: gamescope fullscreens us, the game shows
+            # through the transparent top, keys docked at the bottom on a dark strip.
+            vis = self.get_screen().get_rgba_visual()
+            if vis is not None:
+                self.set_visual(vis)
+            self.set_app_paintable(True)
+            self.get_style_context().add_class("gm")
+            grid.get_style_context().add_class("gm-keys")
+            outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+            spacer = Gtk.Box(); spacer.set_vexpand(True)   # transparent filler
+            outer.pack_start(spacer, True, True, 0)
+            outer.pack_end(grid, False, False, 0)
+            self.add(outer)
+        else:
+            self.add(grid)
         self.set_wmclass("claude-osk", "claude-osk")
         self.set_title("claude-osk")
         self.set_decorated(False)
@@ -250,6 +281,97 @@ class OSK(Gtk.Window):
         if mods: self.ui.syn()
         self.mods.clear(); self._refresh_mods()
 
+    # ---- Game Mode (gamescope overlay) ----
+    def _xprop(self, target, atom, val):
+        subprocess.run(["xprop", "-display", GS_DISPLAY, "-id", target,
+                        "-f", atom, "32c", "-set", atom, str(val)], check=False)
+
+    def _root_touch_mode(self, val):
+        subprocess.run(["xprop", "-display", GS_DISPLAY, "-root", "-f",
+                        "STEAM_TOUCH_CLICK_MODE", "32c",
+                        "-set", "STEAM_TOUCH_CLICK_MODE", str(val)], check=False)
+
+    def _read_touch_mode(self):
+        try:
+            out = subprocess.check_output(
+                ["xprop", "-display", GS_DISPLAY, "-root", "STEAM_TOUCH_CLICK_MODE"],
+                text=True, timeout=3)
+            return int(out.strip().split("=")[-1])
+        except Exception:
+            return 4   # SteamOS default (Passthrough)
+
+    def gm_show(self):
+        """Become the input-capable gamescope overlay: STEAM_OVERLAY + STEAM_INPUT_FOCUS=2
+        (touch->us so keys are tappable; keyboard stays with the game so our injected
+        keystrokes land there), and switch touch mode to 1 (Left) so taps become clicks."""
+        gw = self.get_window()
+        if gw is None:
+            return False
+        try:
+            xid = hex(gw.get_xid())
+        except Exception:
+            return False
+        if self.orig_touch_mode is None:
+            self.orig_touch_mode = self._read_touch_mode()
+        self._xprop(xid, "STEAM_OVERLAY", 1)
+        self._xprop(xid, "STEAM_INPUT_FOCUS", 2)
+        self._root_touch_mode(1)
+        return False   # one-shot for GLib.timeout_add
+
+    def gm_hide(self):
+        """Hand input back to the game and restore the original touch mode."""
+        gw = self.get_window()
+        if gw is not None:
+            try: self._xprop(hex(gw.get_xid()), "STEAM_INPUT_FOCUS", 0)
+            except Exception: pass
+        self._root_touch_mode(self.orig_touch_mode if self.orig_touch_mode is not None else 4)
+
+
+def setup_hotkey(config, toggle):
+    """Watch input devices for the configured hotkey combo and call toggle().
+    evdev-level, so it works regardless of which window has focus. Needs read
+    access to /dev/input/event* (installer's udev rule + 'input' group)."""
+    names = config.get("hotkey") or []
+    codes = {getattr(e, n) for n in names if isinstance(getattr(e, n, None), int)}
+    if not codes:
+        return
+    try:
+        from evdev import InputDevice, list_devices
+    except Exception:
+        return
+    pressed = set()
+
+    def on_input(fd, cond, dev):
+        try:
+            for ev in dev.read():
+                if ev.type != e.EV_KEY:
+                    continue
+                if ev.value == 1:
+                    pressed.add(ev.code)
+                elif ev.value == 0:
+                    pressed.discard(ev.code)
+                if codes <= pressed:           # all hotkey keys held together
+                    pressed.clear()
+                    toggle()
+        except OSError:
+            return False                       # device unplugged → drop the watch
+        return True
+
+    opened = 0
+    for path in list_devices():
+        try:
+            dev = InputDevice(path)
+            if dev.name == "claude-osk":        # skip our own injected-key device
+                continue
+            if codes <= set(dev.capabilities().get(e.EV_KEY, [])):
+                GLib.io_add_watch(dev.fd, GLib.IO_IN, on_input, dev)
+                opened += 1
+        except Exception:
+            pass
+    if opened == 0:
+        print("claude-osk: hotkey set but no readable input device "
+              "(need 'input' group / udev rule)", file=sys.stderr)
+
 
 def main():
     config = load_config()
@@ -268,10 +390,26 @@ def main():
         try: open(VIS, "w").write(v)
         except Exception: pass
 
-    def _show(*_): w.show_all(); _setvis("1"); return True
-    def _hide(*_): w.hide();     _setvis("0"); return True
+    def _show(*_):
+        w.show_all()
+        if GAMEMODE:                      # set overlay atoms once gamescope has mapped us
+            GLib.timeout_add(250, w.gm_show)
+        _setvis("1"); return True
+
+    def _hide(*_):
+        if GAMEMODE: w.gm_hide()
+        w.hide(); _setvis("0"); return True
     GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, _show, None)
     GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR2, _hide, None)
+
+    def _toggle():
+        cur = "0"
+        try: cur = open(VIS).read().strip()
+        except Exception: pass
+        (_hide if cur == "1" else _show)()
+
+    setup_hotkey(config, _toggle)
+
     _setvis("1" if os.environ.get("CLAUDE_KBD_SHOW") == "1" else "0")
     if os.environ.get("CLAUDE_KBD_SHOW") == "1":
         _show()
@@ -279,4 +417,17 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import faulthandler, traceback
+    try:
+        faulthandler.enable(open("/tmp/claude-kbd-fault.log", "w"))
+    except Exception:
+        pass
+    try:
+        main()
+    except BaseException:
+        try:
+            with open("/tmp/claude-kbd-crash.log", "w") as _f:
+                traceback.print_exc(file=_f)
+        except Exception:
+            pass
+        raise

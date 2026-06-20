@@ -32,5 +32,10 @@
     "special_fg": "#bbccdd",
     "shifted_fg": "#7fb0ff"
   },
-  "locale": "auto"
+  "locale": "auto",
+  "hotkey": [
+    "KEY_LEFTCTRL",
+    "KEY_LEFTALT",
+    "KEY_K"
+  ]
 }
