@@ -1,0 +1,11 @@
+{
+  "KPlugin": {
+    "Id": "claude-osk-opacity",
+    "Name": "Claude OSK Opacity",
+    "Description": "Makes the claude-osk keyboard translucent",
+    "Version": "1.0",
+    "EnabledByDefault": true
+  },
+  "X-Plasma-API": "javascript",
+  "X-Plasma-MainScript": "code/main.js"
+}

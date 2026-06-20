@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Claude OSK
+Exec=python3 /home/deck/.local/bin/claude-kbd.py
+X-GNOME-Autostart-enabled=true

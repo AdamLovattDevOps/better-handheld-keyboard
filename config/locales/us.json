@@ -1,0 +1,18 @@
+{
+  "KEY_GRAVE": {
+    "shifted": "~"
+  },
+  "KEY_2": {
+    "shifted": "@"
+  },
+  "KEY_3": {
+    "shifted": "#"
+  },
+  "KEY_APOSTROPHE": {
+    "shifted": "\""
+  },
+  "KEY_BACKSLASH": {
+    "label": "\\",
+    "shifted": "|"
+  }
+}

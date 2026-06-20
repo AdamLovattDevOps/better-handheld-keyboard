@@ -1,0 +1,10 @@
+# python
+__pycache__/
+*.pyc
+# editor / backups
+*.bak
+*.bak-*
+*~
+.DS_Store
+# runtime scratch (not source)
+*.log

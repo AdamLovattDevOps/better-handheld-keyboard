@@ -1,0 +1,358 @@
+{
+  "name": "Full",
+  "rows": [
+    [
+      {
+        "label": "Esc",
+        "key": "KEY_ESC"
+      },
+      {
+        "label": "F1",
+        "key": "KEY_F1"
+      },
+      {
+        "label": "F2",
+        "key": "KEY_F2"
+      },
+      {
+        "label": "F3",
+        "key": "KEY_F3"
+      },
+      {
+        "label": "F4",
+        "key": "KEY_F4"
+      },
+      {
+        "label": "F5",
+        "key": "KEY_F5"
+      },
+      {
+        "label": "F6",
+        "key": "KEY_F6"
+      },
+      {
+        "label": "F7",
+        "key": "KEY_F7"
+      },
+      {
+        "label": "F8",
+        "key": "KEY_F8"
+      },
+      {
+        "label": "F9",
+        "key": "KEY_F9"
+      },
+      {
+        "label": "F10",
+        "key": "KEY_F10"
+      },
+      {
+        "label": "F11",
+        "key": "KEY_F11"
+      },
+      {
+        "label": "F12",
+        "key": "KEY_F12"
+      }
+    ],
+    [
+      {
+        "label": "`",
+        "key": "KEY_GRAVE",
+        "shifted": "~"
+      },
+      {
+        "label": "1",
+        "key": "KEY_1",
+        "shifted": "!"
+      },
+      {
+        "label": "2",
+        "key": "KEY_2",
+        "shifted": "@"
+      },
+      {
+        "label": "3",
+        "key": "KEY_3",
+        "shifted": "#"
+      },
+      {
+        "label": "4",
+        "key": "KEY_4",
+        "shifted": "$"
+      },
+      {
+        "label": "5",
+        "key": "KEY_5",
+        "shifted": "%"
+      },
+      {
+        "label": "6",
+        "key": "KEY_6",
+        "shifted": "^"
+      },
+      {
+        "label": "7",
+        "key": "KEY_7",
+        "shifted": "&"
+      },
+      {
+        "label": "8",
+        "key": "KEY_8",
+        "shifted": "*"
+      },
+      {
+        "label": "9",
+        "key": "KEY_9",
+        "shifted": "("
+      },
+      {
+        "label": "0",
+        "key": "KEY_0",
+        "shifted": ")"
+      },
+      {
+        "label": "-",
+        "key": "KEY_MINUS",
+        "shifted": "_"
+      },
+      {
+        "label": "=",
+        "key": "KEY_EQUAL",
+        "shifted": "+"
+      },
+      {
+        "label": "⌫",
+        "key": "KEY_BACKSPACE",
+        "kind": "wide"
+      }
+    ],
+    [
+      {
+        "label": "Tab",
+        "key": "KEY_TAB",
+        "kind": "wide"
+      },
+      {
+        "label": "q",
+        "key": "KEY_Q"
+      },
+      {
+        "label": "w",
+        "key": "KEY_W"
+      },
+      {
+        "label": "e",
+        "key": "KEY_E"
+      },
+      {
+        "label": "r",
+        "key": "KEY_R"
+      },
+      {
+        "label": "t",
+        "key": "KEY_T"
+      },
+      {
+        "label": "y",
+        "key": "KEY_Y"
+      },
+      {
+        "label": "u",
+        "key": "KEY_U"
+      },
+      {
+        "label": "i",
+        "key": "KEY_I"
+      },
+      {
+        "label": "o",
+        "key": "KEY_O"
+      },
+      {
+        "label": "p",
+        "key": "KEY_P"
+      },
+      {
+        "label": "[",
+        "key": "KEY_LEFTBRACE",
+        "shifted": "{"
+      },
+      {
+        "label": "]",
+        "key": "KEY_RIGHTBRACE",
+        "shifted": "}"
+      },
+      {
+        "label": "\\",
+        "key": "KEY_BACKSLASH",
+        "shifted": "|"
+      }
+    ],
+    [
+      {
+        "label": "Ctrl",
+        "key": "KEY_LEFTCTRL",
+        "kind": "mod"
+      },
+      {
+        "label": "a",
+        "key": "KEY_A"
+      },
+      {
+        "label": "s",
+        "key": "KEY_S"
+      },
+      {
+        "label": "d",
+        "key": "KEY_D"
+      },
+      {
+        "label": "f",
+        "key": "KEY_F"
+      },
+      {
+        "label": "g",
+        "key": "KEY_G"
+      },
+      {
+        "label": "h",
+        "key": "KEY_H"
+      },
+      {
+        "label": "j",
+        "key": "KEY_J"
+      },
+      {
+        "label": "k",
+        "key": "KEY_K"
+      },
+      {
+        "label": "l",
+        "key": "KEY_L"
+      },
+      {
+        "label": ";",
+        "key": "KEY_SEMICOLON",
+        "shifted": ":"
+      },
+      {
+        "label": "'",
+        "key": "KEY_APOSTROPHE",
+        "shifted": "\""
+      },
+      {
+        "label": "⏎",
+        "key": "KEY_ENTER",
+        "kind": "wide"
+      }
+    ],
+    [
+      {
+        "label": "Shift",
+        "key": "KEY_LEFTSHIFT",
+        "kind": "mod"
+      },
+      {
+        "label": "z",
+        "key": "KEY_Z"
+      },
+      {
+        "label": "x",
+        "key": "KEY_X"
+      },
+      {
+        "label": "c",
+        "key": "KEY_C"
+      },
+      {
+        "label": "v",
+        "key": "KEY_V"
+      },
+      {
+        "label": "b",
+        "key": "KEY_B"
+      },
+      {
+        "label": "n",
+        "key": "KEY_N"
+      },
+      {
+        "label": "m",
+        "key": "KEY_M"
+      },
+      {
+        "label": ",",
+        "key": "KEY_COMMA",
+        "shifted": "<"
+      },
+      {
+        "label": ".",
+        "key": "KEY_DOT",
+        "shifted": ">"
+      },
+      {
+        "label": "/",
+        "key": "KEY_SLASH",
+        "shifted": "?"
+      },
+      {
+        "label": "↑",
+        "key": "KEY_UP"
+      }
+    ],
+    [
+      {
+        "label": "⊞",
+        "key": "KEY_LEFTMETA",
+        "kind": "mod"
+      },
+      {
+        "label": "Alt",
+        "key": "KEY_LEFTALT",
+        "kind": "mod"
+      },
+      {
+        "label": "Space",
+        "key": "KEY_SPACE",
+        "kind": "space"
+      },
+      {
+        "label": "Home",
+        "key": "KEY_HOME"
+      },
+      {
+        "label": "End",
+        "key": "KEY_END"
+      },
+      {
+        "label": "PgUp",
+        "key": "KEY_PAGEUP"
+      },
+      {
+        "label": "PgDn",
+        "key": "KEY_PAGEDOWN"
+      },
+      {
+        "label": "Del",
+        "key": "KEY_DELETE"
+      },
+      {
+        "label": "←",
+        "key": "KEY_LEFT"
+      },
+      {
+        "label": "↓",
+        "key": "KEY_DOWN"
+      },
+      {
+        "label": "→",
+        "key": "KEY_RIGHT"
+      },
+      {
+        "label": "🌐",
+        "kind": "locale"
+      }
+    ]
+  ]
+}

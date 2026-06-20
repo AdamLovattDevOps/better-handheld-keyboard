@@ -1,0 +1,362 @@
+#!/usr/bin/env bash
+# claude-osk — install / uninstall a transparent on-screen keyboard that replaces
+# Steam's OSK on KDE Plasma (Wayland). Injects REAL keys via /dev/uinput (full
+# Ctrl/Alt/F-keys), pinned & translucent via KWin, mirrors Steam's OSK so the same
+# Steam keyboard button toggles it.
+#
+# Usage:  claude-osk install | uninstall | status | restart
+# Idempotent: re-running install just refreshes everything.
+# NB: no `set -e` — uninstall must be best-effort and tolerate missing pieces
+# (e.g. grep returning non-zero when removing the last rule).
+set -uo pipefail
+
+BIN="$HOME/.local/bin"
+KSCRIPT="$HOME/.local/share/kwin/scripts/claude-osk-opacity"
+AUTOSTART="$HOME/.config/autostart"
+KWINRULES="$HOME/.config/kwinrulesrc"
+RULE_UUID="a8a95de3-82aa-4998-87c0-125fb8525143"
+log(){ printf '  • %s\n' "$*"; }
+
+# ---------------------------------------------------------------- file writers
+write_files() {
+    mkdir -p "$BIN" "$AUTOSTART" "$KSCRIPT/contents/code"
+
+    cat > "$BIN/claude-kbd.py" <<'PYEOF'
+#!/usr/bin/env python3
+"""Claude OSK — a dark on-screen keyboard that injects REAL keys via /dev/uinput."""
+import gi, sys, time, os, signal
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk, Gdk, GLib
+from evdev import UInput, ecodes as e
+GLib.set_prgname("claude-osk")   # app_id so KWin window-rule can match us
+
+K = e
+ROWS = [
+    [("Esc",K.KEY_ESC,''),("F1",K.KEY_F1,''),("F2",K.KEY_F2,''),("F3",K.KEY_F3,''),("F4",K.KEY_F4,''),
+     ("F5",K.KEY_F5,''),("F6",K.KEY_F6,''),("F7",K.KEY_F7,''),("F8",K.KEY_F8,''),("F9",K.KEY_F9,''),
+     ("F10",K.KEY_F10,''),("F11",K.KEY_F11,''),("F12",K.KEY_F12,'')],
+    [("`",K.KEY_GRAVE,''),("1",K.KEY_1,''),("2",K.KEY_2,''),("3",K.KEY_3,''),("4",K.KEY_4,''),("5",K.KEY_5,''),
+     ("6",K.KEY_6,''),("7",K.KEY_7,''),("8",K.KEY_8,''),("9",K.KEY_9,''),("0",K.KEY_0,''),
+     ("-",K.KEY_MINUS,''),("=",K.KEY_EQUAL,''),("⌫",K.KEY_BACKSPACE,'wide')],
+    [("Tab",K.KEY_TAB,'wide'),("q",K.KEY_Q,''),("w",K.KEY_W,''),("e",K.KEY_E,''),("r",K.KEY_R,''),("t",K.KEY_T,''),
+     ("y",K.KEY_Y,''),("u",K.KEY_U,''),("i",K.KEY_I,''),("o",K.KEY_O,''),("p",K.KEY_P,''),
+     ("[",K.KEY_LEFTBRACE,''),("]",K.KEY_RIGHTBRACE,''),("\\",K.KEY_BACKSLASH,'')],
+    [("Ctrl",K.KEY_LEFTCTRL,'mod'),("a",K.KEY_A,''),("s",K.KEY_S,''),("d",K.KEY_D,''),("f",K.KEY_F,''),("g",K.KEY_G,''),
+     ("h",K.KEY_H,''),("j",K.KEY_J,''),("k",K.KEY_K,''),("l",K.KEY_L,''),(";",K.KEY_SEMICOLON,''),
+     ("'",K.KEY_APOSTROPHE,''),("⏎",K.KEY_ENTER,'wide')],
+    [("Shift",K.KEY_LEFTSHIFT,'mod'),("z",K.KEY_Z,''),("x",K.KEY_X,''),("c",K.KEY_C,''),("v",K.KEY_V,''),("b",K.KEY_B,''),
+     ("n",K.KEY_N,''),("m",K.KEY_M,''),(",",K.KEY_COMMA,''),(".",K.KEY_DOT,''),("/",K.KEY_SLASH,''),("↑",K.KEY_UP,'')],
+    [("Ctrl",K.KEY_LEFTCTRL,'mod'),("Alt",K.KEY_LEFTALT,'mod'),("Space",K.KEY_SPACE,'space'),
+     ("Home",K.KEY_HOME,''),("End",K.KEY_END,''),("PgUp",K.KEY_PAGEUP,''),("PgDn",K.KEY_PAGEDOWN,''),
+     ("Del",K.KEY_DELETE,''),("←",K.KEY_LEFT,''),("↓",K.KEY_DOWN,''),("→",K.KEY_RIGHT,'')],
+]
+SHIFTED = {
+    K.KEY_GRAVE:"~", K.KEY_1:"!", K.KEY_2:"@", K.KEY_3:"#", K.KEY_4:"$", K.KEY_5:"%",
+    K.KEY_6:"^", K.KEY_7:"&", K.KEY_8:"*", K.KEY_9:"(", K.KEY_0:")", K.KEY_MINUS:"_", K.KEY_EQUAL:"+",
+    K.KEY_LEFTBRACE:"{", K.KEY_RIGHTBRACE:"}", K.KEY_BACKSLASH:"|",
+    K.KEY_SEMICOLON:":", K.KEY_APOSTROPHE:"\"", K.KEY_COMMA:"<", K.KEY_DOT:">", K.KEY_SLASH:"?",
+}
+def _esc(s): return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+ALLKEYS = sorted({kc for row in ROWS for (_,kc,_) in row if kc is not None})
+
+CSS = b"""
+window { background-color: #161616; }
+button { background: #333333; color: #f5f5f5; border: 1px solid #0d0d0d;
+         border-radius: 5px; font-size: 18px; margin: 2px; padding: 6px; }
+button:active { background: #3daee9; }
+button.mod-on { background: #ff8c00; color: #000000; font-weight: bold;
+                border: 3px solid #ffe000; }
+button.special { background: #2a2a2a; color: #bcd; }
+button.hide { background: #5a1f1f; color: #ffd9d9; }
+button.hide:active { background: #c0392b; }
+"""
+
+class OSK(Gtk.Window):
+    def __init__(self):
+        super().__init__()
+        self.ui = UInput({e.EV_KEY: ALLKEYS}, name="claude-osk")
+        self.mods = {}
+        self.modbtns = []
+        prov = Gtk.CssProvider(); prov.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), prov,
+                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        grid = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        grid.set_margin_top(4); grid.set_margin_bottom(4)
+        for row in ROWS:
+            hb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+            hb.set_halign(Gtk.Align.CENTER)
+            for (label, kc, kind) in row:
+                b = Gtk.Button(label=label)
+                b.set_can_focus(False)
+                if kind == '' and kc in SHIFTED:
+                    ch = b.get_child()
+                    if isinstance(ch, Gtk.Label):
+                        ch.set_markup(_esc(label) +
+                            " <span size='xx-small' foreground='#7fb0ff'>" + _esc(SHIFTED[kc]) + "</span>")
+                exp = kind in ('wide','space')
+                b.set_hexpand(exp)
+                if kind == 'space': b.set_size_request(360, -1)
+                elif kind == 'wide': b.set_size_request(110, 64)
+                else: b.set_size_request(74, 64)
+                if kind == 'hide':
+                    b.get_style_context().add_class('hide'); b.set_size_request(74, 64)
+                    b.connect("clicked", lambda *_: self.hide())
+                elif kind == 'mod':
+                    b.get_style_context().add_class('special')
+                    b.connect("clicked", self.on_mod, kc)
+                    self.modbtns.append((b, kc))
+                else:
+                    b.connect("clicked", self.on_key, kc)
+                hb.pack_start(b, exp, exp, 0)
+            grid.pack_start(hb, False, False, 0)
+        self.add(grid)
+        self.set_wmclass("claude-osk", "claude-osk")
+        self.set_title("claude-osk")
+        self.set_decorated(False)
+        self.set_skip_taskbar_hint(True)
+        self.set_skip_pager_hint(True)
+        self.set_keep_above(True)
+        self.set_default_size(1280, 360)
+        self.set_gravity(Gdk.Gravity.SOUTH)
+
+    def _refresh_mods(self):
+        for b, k in self.modbtns:
+            ctx = b.get_style_context()
+            (ctx.add_class if k in self.mods else ctx.remove_class)('mod-on')
+
+    def on_mod(self, btn, kc):
+        if kc in self.mods: del self.mods[kc]
+        else: self.mods[kc] = True
+        self._refresh_mods()
+
+    def on_key(self, btn, kc):
+        mods = list(self.mods)
+        for m in mods: self.ui.write(e.EV_KEY, m, 1)
+        if mods: self.ui.syn(); time.sleep(0.02)
+        self.ui.write(e.EV_KEY, kc, 1); self.ui.syn(); time.sleep(0.02)
+        self.ui.write(e.EV_KEY, kc, 0); self.ui.syn(); time.sleep(0.02)
+        for m in reversed(mods): self.ui.write(e.EV_KEY, m, 0)
+        if mods: self.ui.syn()
+        self.mods.clear(); self._refresh_mods()
+
+w = OSK()
+w.connect("destroy", Gtk.main_quit)
+open("/tmp/claude-kbd.pid", "w").write(str(os.getpid()))
+VIS = "/tmp/claude-kbd.vis"
+def _setvis(v):
+    try: open(VIS, "w").write(v)
+    except Exception: pass
+def _show(*_): w.show_all(); _setvis("1"); return True
+def _hide(*_): w.hide();     _setvis("0"); return True
+GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, _show, None)
+GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR2, _hide, None)
+if os.environ.get("CLAUDE_KBD_SHOW") == "1":
+    _show()
+else:
+    _setvis("0")
+Gtk.main()
+PYEOF
+    chmod +x "$BIN/claude-kbd.py"
+
+    cat > "$BIN/claude-kbd-swap.sh" <<'SWEOF'
+#!/bin/bash
+# Claude OSK swap daemon (MIRROR, self-correcting). Ours mirrors Steam's OSK
+# visibility via /tmp/claude-kbd.vis. Also loads the opacity KWin script at start.
+export DISPLAY=:0
+NAME="Steam Input On-screen Keyboard"
+VIS=/tmp/claude-kbd.vis
+KBD="$HOME/.local/bin/claude-kbd.py"
+
+exec 9>/tmp/claude-kbd-swap.lock
+flock -n 9 || exit 0
+
+OPSCRIPT="$HOME/.local/share/kwin/scripts/claude-osk-opacity/contents/code/main.js"
+{
+  echo "STARTUP $(date) OPSCRIPT=$OPSCRIPT exists=$([ -f "$OPSCRIPT" ] && echo Y || echo N)"
+  qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript "claude-osk-opacity" 2>&1
+  echo "load: $(qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$OPSCRIPT" "claude-osk-opacity" 2>&1)"
+  qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.start 2>&1
+} >>/tmp/swap-startup.log 2>&1
+
+while true; do
+    steam=0
+    for w in $(xwininfo -root -tree 2>/dev/null | grep -i "$NAME" | grep -oE '0x[0-9a-f]+'); do
+        # Hard-hide Steam's OSK: force its X11 window fully transparent. KWin honors
+        # _NET_WM_WINDOW_OPACITY natively, so this can't silently fail the way the
+        # KWin-scripting load can. Applied to every matching window each pass.
+        xprop -id "$w" -f _NET_WM_WINDOW_OPACITY 32c -set _NET_WM_WINDOW_OPACITY 0 2>/dev/null
+        xwininfo -id "$w" 2>/dev/null | grep -q IsViewable && steam=1
+    done
+    ours=$(cat "$VIS" 2>/dev/null); ours=${ours:-0}
+    pid=$(pgrep -f 'python3 .*claude-kbd\.py' | head -1)
+    if [ -z "$pid" ]; then
+        # Watchdog: the keyboard process can die when Steam restarts / the compositor
+        # churns (button spam) and its Wayland connection drops. Respawn it (hidden),
+        # throttled to once / 3s, so it recovers WITHOUT needing a reboot.
+        now=$(date +%s)
+        if [ $((now - ${lastspawn:-0})) -ge 3 ]; then
+            lastspawn=$now
+            setsid python3 "$KBD" </dev/null >/dev/null 2>&1 &
+        fi
+    else
+        if [ "$steam" = 1 ] && [ "$ours" = 0 ]; then kill -USR1 "$pid" 2>/dev/null
+        elif [ "$steam" = 0 ] && [ "$ours" = 1 ]; then kill -USR2 "$pid" 2>/dev/null
+        fi
+    fi
+    sleep 0.1
+done
+SWEOF
+    chmod +x "$BIN/claude-kbd-swap.sh"
+
+    cat > "$KSCRIPT/metadata.json" <<'MJEOF'
+{
+  "KPlugin": {
+    "Id": "claude-osk-opacity",
+    "Name": "Claude OSK Opacity",
+    "Description": "Makes the claude-osk keyboard translucent",
+    "Version": "1.0",
+    "EnabledByDefault": true
+  },
+  "X-Plasma-API": "javascript",
+  "X-Plasma-MainScript": "code/main.js"
+}
+MJEOF
+
+    cat > "$KSCRIPT/contents/code/main.js" <<'MAINEOF'
+function setOp(w){
+    try {
+        var c = "" + w.resourceClass;
+        var cap = "" + w.caption;
+        if (c.indexOf("claude-osk") !== -1) w.opacity = 0.72;
+        else if (cap.indexOf("Steam Input On-screen Keyboard") !== -1) w.opacity = 0.0;
+    } catch(e){}
+}
+workspace.windowList().forEach(setOp);
+workspace.windowAdded.connect(setOp);
+MAINEOF
+
+    cat > "$AUTOSTART/claude-kbd.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Claude OSK
+Exec=python3 $BIN/claude-kbd.py
+X-GNOME-Autostart-enabled=true
+EOF
+    cat > "$AUTOSTART/claude-kbd-swap.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Claude OSK Swap
+Exec=$BIN/claude-kbd-swap.sh
+X-GNOME-Autostart-enabled=true
+EOF
+    log "files written ($BIN, $KSCRIPT, autostart)"
+}
+
+# ---------------------------------------------------------------- kwin config
+install_rule() {
+    local g="$RULE_UUID" k
+    kwriteconfig6 --file kwinrulesrc --group "$g" --key Description "Claude OSK overlay"
+    kwriteconfig6 --file kwinrulesrc --group "$g" --key wmclass "claude-osk"
+    kwriteconfig6 --file kwinrulesrc --group "$g" --key wmclassmatch 1
+    kwriteconfig6 --file kwinrulesrc --group "$g" --key wmclasscomplete false
+    for k in above acceptfocus noborder skiptaskbar skippager; do :; done
+    kwriteconfig6 --file kwinrulesrc --group "$g" --key above true
+    kwriteconfig6 --file kwinrulesrc --group "$g" --key aboverule 2
+    kwriteconfig6 --file kwinrulesrc --group "$g" --key acceptfocus false
+    kwriteconfig6 --file kwinrulesrc --group "$g" --key acceptfocusrule 2
+    kwriteconfig6 --file kwinrulesrc --group "$g" --key noborder true
+    kwriteconfig6 --file kwinrulesrc --group "$g" --key noborderrule 2
+    kwriteconfig6 --file kwinrulesrc --group "$g" --key skiptaskbar true
+    kwriteconfig6 --file kwinrulesrc --group "$g" --key skiptaskbarrule 2
+    kwriteconfig6 --file kwinrulesrc --group "$g" --key skippager true
+    kwriteconfig6 --file kwinrulesrc --group "$g" --key skippagerrule 2
+    kwriteconfig6 --file kwinrulesrc --group "$g" --key position "0,378"
+    kwriteconfig6 --file kwinrulesrc --group "$g" --key positionrule 2
+    kwriteconfig6 --file kwinrulesrc --group "$g" --key size "1280,422"
+    kwriteconfig6 --file kwinrulesrc --group "$g" --key sizerule 2
+    # register UUID in [General] rules (idempotent)
+    local cur; cur=$(kreadconfig6 --file kwinrulesrc --group General --key rules 2>/dev/null || true)
+    case ",$cur," in *",$g,"*) ;; *) cur="${cur:+$cur,}$g" ;; esac
+    kwriteconfig6 --file kwinrulesrc --group General --key rules "$cur"
+    kwriteconfig6 --file kwinrulesrc --group General --key count "$(awk -F, '{print NF}' <<<"$cur")"
+    # enable opacity plugin
+    kwriteconfig6 --file kwinrc --group Plugins --key claude-osk-opacityEnabled true
+    log "KWin window-rule + opacity plugin enabled"
+}
+
+remove_rule() {
+    local g="$RULE_UUID"
+    # drop UUID from [General] rules
+    local cur new; cur=$(kreadconfig6 --file kwinrulesrc --group General --key rules 2>/dev/null || true)
+    new=$(printf '%s' "$cur" | tr ',' '\n' | grep -vx "$g" | paste -sd, - || true)
+    kwriteconfig6 --file kwinrulesrc --group General --key rules "$new"
+    kwriteconfig6 --file kwinrulesrc --group General --key count "$( [ -z "$new" ] && echo 0 || awk -F, '{print NF}' <<<"$new")"
+    # strip the [UUID] section from kwinrulesrc
+    if [ -f "$KWINRULES" ]; then
+        awk -v g="[$g]" 'BEGIN{s=0} /^\[/{s=($0==g)} s{next} {print}' "$KWINRULES" > "$KWINRULES.tmp" && mv "$KWINRULES.tmp" "$KWINRULES"
+    fi
+    kwriteconfig6 --file kwinrc --group Plugins --key claude-osk-opacityEnabled --delete 2>/dev/null || true
+    log "KWin window-rule + opacity plugin removed"
+}
+
+kwin_reload() { qdbus6 org.kde.KWin /KWin reconfigure 2>/dev/null || true; }
+
+# ---------------------------------------------------------------- process mgmt
+stop_procs() {
+    for p in $(pgrep -f 'bash .*claude-kbd-swap\.sh'); do kill -9 "$p" 2>/dev/null || true; done
+    for p in $(pgrep -f 'python3 .*claude-kbd\.py'); do kill -9 "$p" 2>/dev/null || true; done
+    rm -f /tmp/claude-kbd-swap.lock /tmp/claude-kbd.pid /tmp/claude-kbd.vis
+    qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript "claude-osk-opacity" 2>/dev/null || true
+}
+
+start_procs() {
+    stop_procs; sleep 1
+    setsid python3 "$BIN/claude-kbd.py" </dev/null >/tmp/claude-kbd.log 2>&1 &
+    sleep 1
+    nohup setsid bash "$BIN/claude-kbd-swap.sh" </dev/null >/tmp/swap.log 2>&1 & disown || true
+}
+
+# ---------------------------------------------------------------- subcommands
+cmd_install() {
+    echo "Installing claude-osk…"
+    command -v kwriteconfig6 >/dev/null || { echo "needs kwriteconfig6 (KDE)"; exit 1; }
+    python3 -c "import gi,evdev" 2>/dev/null || echo "  ! WARNING: python deps missing — need python-gobject + python-evdev"
+    write_files
+    install_rule
+    kwin_reload
+    start_procs
+    log "started for this session"
+    echo "Done. For a guaranteed-clean start, log out and back in."
+    echo "Use: press Steam's keyboard button to show/hide it."
+}
+
+cmd_uninstall() {
+    echo "Uninstalling claude-osk…"
+    stop_procs
+    rm -f "$BIN/claude-kbd.py" "$BIN/claude-kbd-swap.sh"
+    rm -f "$AUTOSTART/claude-kbd.desktop" "$AUTOSTART/claude-kbd-swap.desktop"
+    rm -rf "$KSCRIPT"
+    remove_rule
+    kwin_reload
+    rm -f /tmp/swap.log /tmp/swap-startup.log /tmp/claude-kbd.log
+    log "removed files, autostart, KWin rule + script"
+    echo "Done. (claude-osk itself left at $BIN/claude-osk — delete manually if desired.)"
+}
+
+cmd_status() {
+    echo "claude-osk status:"
+    log "keyboard:  $(pgrep -f 'python3 .*claude-kbd\.py' >/dev/null && echo running || echo stopped)"
+    log "daemon:    $(pgrep -f 'bash .*claude-kbd-swap\.sh' >/dev/null && echo running || echo stopped)"
+    log "kbd file:  $([ -f "$BIN/claude-kbd.py" ] && echo yes || echo no)"
+    log "kwin rule: $(kreadconfig6 --file kwinrulesrc --group General --key rules 2>/dev/null | grep -q "$RULE_UUID" && echo yes || echo no)"
+    log "opacity:   $(kreadconfig6 --file kwinrc --group Plugins --key claude-osk-opacityEnabled 2>/dev/null || echo unset)"
+    log "autostart: $(ls "$AUTOSTART"/claude-kbd*.desktop 2>/dev/null | wc -l) entries"
+}
+
+case "${1:-}" in
+    install)   cmd_install ;;
+    uninstall) cmd_uninstall ;;
+    status)    cmd_status ;;
+    restart)   start_procs; echo "restarted" ;;
+    *) echo "usage: claude-osk {install|uninstall|status|restart}"; exit 1 ;;
+esac

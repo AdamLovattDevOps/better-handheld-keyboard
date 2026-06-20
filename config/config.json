@@ -1,0 +1,36 @@
+{
+  "layout": "full",
+  "opacity": 0.72,
+  "geometry": {
+    "x": 0,
+    "y": 378,
+    "w": 1280,
+    "h": 422
+  },
+  "key_size": [
+    74,
+    64
+  ],
+  "wide_size": [
+    110,
+    64
+  ],
+  "space_width": 360,
+  "key_settle_ms": 20,
+  "game_overlay": true,
+  "per_game_overlay": {},
+  "theme": {
+    "window_bg": "#161616",
+    "key_bg": "#333333",
+    "key_fg": "#f5f5f5",
+    "key_border": "#0d0d0d",
+    "key_active": "#3daee9",
+    "mod_on_bg": "#ff8c00",
+    "mod_on_fg": "#000000",
+    "mod_on_border": "#ffe000",
+    "special_bg": "#2a2a2a",
+    "special_fg": "#bbccdd",
+    "shifted_fg": "#7fb0ff"
+  },
+  "locale": "auto"
+}

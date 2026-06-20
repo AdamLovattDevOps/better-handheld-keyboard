@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Claude OSK Swap
+Exec=/home/deck/.local/bin/claude-kbd-swap.sh
+X-GNOME-Autostart-enabled=true
