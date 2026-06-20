@@ -85,7 +85,7 @@ python3 -c "import evdev" 2>/dev/null || MISSING="$MISSING python-evdev"
 
 echo
 say "Done!"
-echo "   • Log out and back in once (activates input-group access + autostart)."
-echo "   • Then press your hotkey (default Ctrl+Alt+K) to toggle the keyboard."
-echo "   • Edit ~/.config/claude-osk/config.json to change the hotkey, opacity, layout."
+echo "   • Log out and back in once (activates autostart + permissions)."
+echo "   • Then press your device's keyboard button — this keyboard comes up instead."
+echo "   • Edit ~/.config/claude-osk/config.json for opacity, layout, theme, optional hotkey."
 [ "${PRIV_OK:-0}" = 1 ] || warn "Permission step didn't complete — typing won't work until it does."

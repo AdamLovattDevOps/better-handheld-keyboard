@@ -12,8 +12,9 @@ Ctrl, Alt, Super, F1–F12, arrows, a full symbol set, and live US/UK switching.
 
 - **Real keystrokes** — full `Ctrl` / `Alt` / `Shift` / `Super`, `F1`–`F12`,
   arrows, navigation cluster, and every symbol. Works everywhere, including games.
-- **Configurable hotkey** — toggle the keyboard with a key combo of your choice
-  (default `Ctrl`+`Alt`+`K`). Works regardless of which window is focused.
+- **Uses your device's keyboard button** — press the hardware keyboard button
+  you already use (the one that pops the built-in keyboard) and *this* one comes
+  up instead. No setup, nothing to press on a keyboard you don't have.
 - **Fully themeable via JSON** — the button layout, transparency, key sizes, and
   colours all live in plain config files. No code editing.
 - **US / UK layout switching** — a 🌐 key flips the system layout and re-labels
@@ -32,7 +33,15 @@ access to `/dev/uinput`, which is how it types). Then **log out and back in**.
 ```
 then log out and back in.
 
-After that, press your hotkey (**`Ctrl`+`Alt`+`K`** by default) to toggle it.
+## How you bring it up
+
+**Just press your device's keyboard button** — the same hardware button that used
+to summon the built-in keyboard. This one takes its place automatically. No
+keyboard chord required (you don't have a keyboard — that's the whole point).
+
+**Optional hotkey:** if you have a physical keyboard attached, *or* you map a
+controller chord to a key combo in **Steam Input**, set `hotkey` in `config.json`
+to that combo and it'll toggle the keyboard too. Off by default.
 
 ## Configure
 

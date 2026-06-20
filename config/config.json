@@ -33,9 +33,5 @@
     "shifted_fg": "#7fb0ff"
   },
   "locale": "auto",
-  "hotkey": [
-    "KEY_LEFTCTRL",
-    "KEY_LEFTALT",
-    "KEY_K"
-  ]
+  "hotkey": []
 }

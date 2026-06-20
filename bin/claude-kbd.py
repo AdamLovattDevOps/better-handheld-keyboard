@@ -29,10 +29,11 @@ DEFAULT_CONFIG = {
     "geometry": {"x": 0, "y": 378, "w": 1280, "h": 422},
     "key_size": [74, 64], "wide_size": [110, 64], "space_width": 360,
     "key_settle_ms": 20,
-    # global hotkey to toggle the keyboard (evdev key names, pressed together).
-    # [] disables it. Works regardless of focus. Needs read access to /dev/input
-    # (the installer's udev rule + 'input' group grant this).
-    "hotkey": ["KEY_LEFTCTRL", "KEY_LEFTALT", "KEY_K"],
+    # OPTIONAL extra toggle. The primary trigger is your device's keyboard button
+    # (handled by the mirror daemon — no setup). This hotkey is for an attached
+    # keyboard, or a controller chord mapped to this combo in Steam Input. [] = off.
+    # Needs read access to /dev/input (installer's udev rule + 'input' group).
+    "hotkey": [],
     "theme": {
         "window_bg": "#161616", "key_bg": "#333333", "key_fg": "#f5f5f5",
         "key_border": "#0d0d0d", "key_active": "#3daee9",
