@@ -21,6 +21,28 @@ Ctrl, Alt, Super, F1–F12, arrows, a full symbol set, and live US/UK switching.
   the keys to match (so `£`, `@`, `#`, `"` land where they should).
 - **Sticky one-shot modifiers** with a clear "armed" highlight.
 
+## How it works
+
+```
+  ┌──────────────┐  remap   ┌──────────────┐   DBus      ┌──────────────────┐
+  │  keyboard    │ ───────▶ │ InputPlumber │ ──────────▶ │  handheld-kbd.py │
+  │  button (HW) │          │              │  ui_select  │  (GTK keyboard)  │
+  └──────────────┘          └──────────────┘             └────────┬─────────┘
+                                                          tap key  │
+                                                                   ▼
+                                       /dev/uinput  ◀──  inject  ──┘
+                                            │
+                                            ▼  real hardware keystroke
+                                     focused app / game
+```
+
+- The hardware button is remapped (via **InputPlumber**) to fire a **DBus event**,
+  not a keystroke — so nothing else (Steam, KDE) reacts to it. No key collisions.
+- Key taps are injected through **`/dev/uinput`** as real kernel-level key events,
+  so they reach *any* app — including games and full-screen Wayland clients.
+- A tiny daemon (`handheld-kbd-swap.sh`) applies the remap at login, restarts the
+  keyboard if it dies (watchdog), and handles translucency + single-instance locking.
+
 ## Install
 
 **Easy way:** double-click **`Install Better Handheld Keyboard.desktop`**. A terminal opens,
