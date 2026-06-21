@@ -6,6 +6,14 @@ NAME="Steam Input On-screen Keyboard"
 VIS=/tmp/claude-kbd.vis
 KBD="$HOME/.local/bin/claude-kbd.py"
 
+# Mirror Steam's OSK by default (hardware keyboard-button trigger). Set "mirror": false
+# in config.json to instead drive the keyboard with a controller chord / hotkey — then
+# the daemon won't hide what the hotkey just showed.
+MIRROR=$(python3 -c 'import json,os
+try: print(0 if json.load(open(os.path.expanduser("~/.config/claude-osk/config.json"))).get("mirror", True) is False else 1)
+except Exception: print(1)' 2>/dev/null)
+[ "$MIRROR" = 0 ] || MIRROR=1
+
 exec 9>/tmp/claude-kbd-swap.lock
 flock -n 9 || exit 0
 
@@ -49,34 +57,33 @@ while true; do
             qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.start >/dev/null 2>&1
         fi
     fi
-    # dismiss latch: the hide button sets this. While set we UNMAP Steam's OSK
-    # (properly dismiss it, so its invisible window can't keep capturing taps) instead
-    # of just hiding it behind ours. Clears once it's gone → next keyboard-button
-    # press re-maps Steam's OSK and we show ours again.
-    supp=0; [ -f /tmp/claude-kbd.suppress ] && supp=1
-    steam=0
-    for w in $(xwininfo -root -tree 2>/dev/null | grep -i "$NAME" | grep -oE '0x[0-9a-f]+'); do
-        if [ "$supp" = 1 ]; then
-            xdotool windowunmap "$w" 2>/dev/null            # hide button → kill the ghost OSK
-        else
-            # normal mirror: keep Steam's OSK mapped but invisible behind ours.
-            xprop -id "$w" -f _NET_WM_WINDOW_OPACITY 32c -set _NET_WM_WINDOW_OPACITY 0 2>/dev/null
-        fi
-        xwininfo -id "$w" 2>/dev/null | grep -q IsViewable && steam=1
-    done
-    ours=$(cat "$VIS" 2>/dev/null); ours=${ours:-0}
-    [ "$steam" = 0 ] && { rm -f /tmp/claude-kbd.suppress; supp=0; }
     pid=$(pgrep -f 'python3 .*claude-kbd\.py' | head -1)
     if [ -z "$pid" ]; then
         # Watchdog: the keyboard process can die when Steam restarts / the compositor
-        # churns (button spam) and its Wayland connection drops. Respawn it (hidden),
-        # throttled to once / 3s, so it recovers WITHOUT needing a reboot.
+        # churns and its Wayland connection drops. Respawn it (hidden), throttled to
+        # once / 3s, so it recovers WITHOUT needing a reboot.
         now=$(date +%s)
         if [ $((now - ${lastspawn:-0})) -ge 3 ]; then
             lastspawn=$now
             setsid python3 "$KBD" </dev/null >/dev/null 2>&1 &
         fi
-    else
+    elif [ "$MIRROR" = 1 ]; then
+        # Mirror Steam's OSK → ours (hardware keyboard-button path). Skipped when
+        # mirror=false (chord/hotkey drives it) so we don't hide what the hotkey showed.
+        # Dismiss latch (hide button) → UNMAP Steam's OSK so its invisible window can't
+        # keep capturing taps; clears once it's gone.
+        supp=0; [ -f /tmp/claude-kbd.suppress ] && supp=1
+        steam=0
+        for w in $(xwininfo -root -tree 2>/dev/null | grep -i "$NAME" | grep -oE '0x[0-9a-f]+'); do
+            if [ "$supp" = 1 ]; then
+                xdotool windowunmap "$w" 2>/dev/null
+            else
+                xprop -id "$w" -f _NET_WM_WINDOW_OPACITY 32c -set _NET_WM_WINDOW_OPACITY 0 2>/dev/null
+            fi
+            xwininfo -id "$w" 2>/dev/null | grep -q IsViewable && steam=1
+        done
+        ours=$(cat "$VIS" 2>/dev/null); ours=${ours:-0}
+        [ "$steam" = 0 ] && rm -f /tmp/claude-kbd.suppress
         if [ "$steam" = 1 ] && [ "$ours" = 0 ] && [ "$supp" = 0 ]; then kill -USR1 "$pid" 2>/dev/null
         elif [ "$steam" = 0 ] && [ "$ours" = 1 ]; then kill -USR2 "$pid" 2>/dev/null
         fi

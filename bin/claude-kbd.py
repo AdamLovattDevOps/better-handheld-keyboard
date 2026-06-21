@@ -29,10 +29,13 @@ DEFAULT_CONFIG = {
     "geometry": {"x": 0, "y": 378, "w": 1280, "h": 422},
     "key_size": [74, 64], "wide_size": [110, 64], "space_width": 360,
     "key_settle_ms": 20,
-    # OPTIONAL extra toggle. The primary trigger is your device's keyboard button
-    # (handled by the mirror daemon — no setup). This hotkey is for an attached
-    # keyboard, or a controller chord mapped to this combo in Steam Input. [] = off.
-    # Needs read access to /dev/input (installer's udev rule + 'input' group).
+    # "mirror": true  → the device's keyboard button summons us (via Steam's OSK).
+    # "mirror": false → drive the keyboard with the hotkey below instead (e.g. a
+    #                   controller chord mapped to it in Steam Input). Read by the daemon.
+    "mirror": True,
+    # Hotkey to TOGGLE the keyboard (evdev key names, pressed together). Used when
+    # mirror is off (or as an extra). Map a controller chord to this combo in Steam
+    # Input. [] = off. Needs /dev/input read access (installer's udev rule + 'input').
     "hotkey": [],
     "theme": {
         "window_bg": "#161616", "key_bg": "#333333", "key_fg": "#f5f5f5",

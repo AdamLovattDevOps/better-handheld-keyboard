@@ -33,5 +33,6 @@
     "shifted_fg": "#7fb0ff"
   },
   "locale": "auto",
-  "hotkey": []
+  "hotkey": [],
+  "mirror": true
 }

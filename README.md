@@ -39,9 +39,14 @@ then log out and back in.
 to summon the built-in keyboard. This one takes its place automatically. No
 keyboard chord required (you don't have a keyboard — that's the whole point).
 
-**Optional hotkey:** if you have a physical keyboard attached, *or* you map a
-controller chord to a key combo in **Steam Input**, set `hotkey` in `config.json`
-to that combo and it'll toggle the keyboard too. Off by default.
+**Prefer a controller chord?** (toggles cleanly, no Steam-OSK quirks) Set in `config.json`:
+- `"mirror": false` — stop using Steam's OSK as the trigger
+- `"hotkey": ["KEY_F13"]` — the key the chord will emit (F13 conflicts with nothing)
+
+Then in **Steam Input**, map a button chord (e.g. **RB + X**) to emit **F13**. Now that
+chord toggles the keyboard — show *and* hide — with no Steam-OSK involvement, so the
+hide button works perfectly. (If Steam Input doesn't offer F13, pick any key it does and
+set `hotkey` to match. Needs `/dev/input` read access — the installer's `input` group.)
 
 ## Configure
 
