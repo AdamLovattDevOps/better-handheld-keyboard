@@ -53,6 +53,10 @@
       {
         "label": "F12",
         "key": "KEY_F12"
+      },
+      {
+        "label": "⌵",
+        "kind": "hide"
       }
     ],
     [

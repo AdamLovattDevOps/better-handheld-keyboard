@@ -58,6 +58,10 @@ while true; do
         xwininfo -id "$w" 2>/dev/null | grep -q IsViewable && steam=1
     done
     ours=$(cat "$VIS" 2>/dev/null); ours=${ours:-0}
+    # dismiss-suppression: the hide button sets this so we don't immediately re-show.
+    # It clears the moment Steam's OSK goes away → next button press shows ours again.
+    supp=0; [ -f /tmp/claude-kbd.suppress ] && supp=1
+    [ "$steam" = 0 ] && { rm -f /tmp/claude-kbd.suppress; supp=0; }
     pid=$(pgrep -f 'python3 .*claude-kbd\.py' | head -1)
     if [ -z "$pid" ]; then
         # Watchdog: the keyboard process can die when Steam restarts / the compositor
@@ -69,7 +73,7 @@ while true; do
             setsid python3 "$KBD" </dev/null >/dev/null 2>&1 &
         fi
     else
-        if [ "$steam" = 1 ] && [ "$ours" = 0 ]; then kill -USR1 "$pid" 2>/dev/null
+        if [ "$steam" = 1 ] && [ "$ours" = 0 ] && [ "$supp" = 0 ]; then kill -USR1 "$pid" 2>/dev/null
         elif [ "$steam" = 0 ] && [ "$ours" = 1 ]; then kill -USR2 "$pid" 2>/dev/null
         fi
     fi

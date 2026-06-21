@@ -121,8 +121,9 @@ def resolve_rows(layout):
         row = []
         for k in jrow:
             kind = k.get("kind", "")
-            if kind == "locale":                      # layout-switch key: no keycode
-                row.append((k.get("label", "🌐"), None, "locale", "", ""))
+            if kind in ("locale", "hide"):            # action keys: no keycode
+                dflt = "🌐" if kind == "locale" else "⌵"
+                row.append((k.get("label", dflt), None, kind, "", ""))
                 continue
             name = k.get("key", "")
             kc = getattr(e, name, None)
@@ -145,6 +146,8 @@ button:active {{ background: {t['key_active']}; }}
 button.mod-on {{ background: {t['mod_on_bg']}; color: {t['mod_on_fg']}; font-weight: bold;
                 border: 3px solid {t['mod_on_border']}; }}
 button.special {{ background: {t['special_bg']}; color: {t['special_fg']}; }}
+button.hide {{ background: #5a1f1f; color: #ffd9d9; }}
+button.hide:active {{ background: #c0392b; }}
 window.gm {{ background-color: rgba(0,0,0,0); }}
 .gm-keys {{ background-color: rgba(12,12,12,0.82); }}
 """.encode()
@@ -169,27 +172,31 @@ class OSK(Gtk.Window):
         prov = Gtk.CssProvider(); prov.load_from_data(build_css(config["theme"]))
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), prov,
                                                   Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-        ksz, wsz, sw = config["key_size"], config["wide_size"], config["space_width"]
-        grid = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        # Uniform aligned grid: every key snaps to a column grid (column_homogeneous),
+        # widths come from per-kind unit spans, rows centred → tidy, even alignment.
+        kh = config["key_size"][1]
+        SPAN = {'': 2, 'wide': 3, 'mod': 3, 'space': 8, 'locale': 2, 'hide': 2}
+        row_units = [sum(SPAN.get(k[2], 2) for k in row) for row in rows]
+        maxu = max(row_units) if row_units else 1
+        grid = Gtk.Grid()
+        grid.set_column_homogeneous(True)
+        grid.set_halign(Gtk.Align.CENTER)
         grid.set_margin_top(4); grid.set_margin_bottom(4)
-        for row in rows:
-            hb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-            hb.set_halign(Gtk.Align.CENTER)
+        for ri, row in enumerate(rows):
+            col = (maxu - row_units[ri]) // 2          # centre each row on the unit grid
             for (label, kc, kind, shifted, name) in row:
+                sp = SPAN.get(kind, 2)
                 b = Gtk.Button(label=label)
                 b.set_can_focus(False)
-                exp = kind in ('wide', 'space')
-                b.set_hexpand(exp)
-                if kind == 'space': b.set_size_request(sw, -1)
-                elif kind == 'wide': b.set_size_request(wsz[0], wsz[1])
-                else: b.set_size_request(ksz[0], ksz[1])
+                b.set_hexpand(True); b.set_vexpand(False)
+                b.set_size_request(-1, kh)
                 if kind == 'locale':
                     b.get_style_context().add_class('special')
                     b.connect("clicked", self.on_locale)
                     self.locale_btn = b
                 elif kind == 'hide':
-                    b.get_style_context().add_class('special')
-                    b.connect("clicked", lambda *_: self.hide())
+                    b.get_style_context().add_class('hide')
+                    b.connect("clicked", lambda *_: self.dismiss())
                 elif kind == 'mod':
                     b.get_style_context().add_class('special')
                     b.connect("clicked", self.on_mod, kc)
@@ -197,8 +204,8 @@ class OSK(Gtk.Window):
                 else:
                     b.connect("clicked", self.on_key, kc)
                     self.keybtns.append((b, name, label, shifted))
-                hb.pack_start(b, exp, exp, 0)
-            grid.pack_start(hb, False, False, 0)
+                grid.attach(b, col, ri, sp, 1)
+                col += sp
         self.orig_touch_mode = None
         if GAMEMODE:
             # Transparent fullscreen overlay: gamescope fullscreens us, the game shows
@@ -281,6 +288,17 @@ class OSK(Gtk.Window):
         for m in reversed(mods): self.ui.write(e.EV_KEY, m, 0)
         if mods: self.ui.syn()
         self.mods.clear(); self._refresh_mods()
+
+    def dismiss(self):
+        """Hide button: hide now and tell the mirror daemon to stay hidden until the
+        next time the device's keyboard button is pressed (so it doesn't pop right back)."""
+        try: open("/tmp/claude-kbd.suppress", "w").write("1")
+        except Exception: pass
+        try: open("/tmp/claude-kbd.vis", "w").write("0")
+        except Exception: pass
+        if GAMEMODE:
+            self.gm_hide()
+        self.hide()
 
     # ---- Game Mode (gamescope overlay) ----
     def _xprop(self, target, atom, val):

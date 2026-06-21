@@ -71,6 +71,10 @@
         "label": "⌫",
         "key": "KEY_BACKSPACE",
         "kind": "wide"
+      },
+      {
+        "label": "⌵",
+        "kind": "hide"
       }
     ],
     [
