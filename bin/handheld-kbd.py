@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Claude OSK — a dark on-screen keyboard that injects REAL keys via /dev/uinput.
+"""Better Handheld Keyboard — a dark on-screen keyboard that injects REAL keys via /dev/uinput.
 
 Layout and appearance are configurable via JSON:
-  ~/.config/claude-osk/config.json          (opacity, geometry, theme, layout, locale)
-  ~/.config/claude-osk/layouts/<name>.json  (the button list)
-  ~/.config/claude-osk/locales/<code>.json  (per-XKB-layout label overrides, e.g. us/gb)
+  ~/.config/handheld-kbd/config.json          (opacity, geometry, theme, layout, locale)
+  ~/.config/handheld-kbd/layouts/<name>.json  (the button list)
+  ~/.config/handheld-kbd/locales/<code>.json  (per-XKB-layout label overrides, e.g. us/gb)
 
 Locale: the keyboard injects real keycodes, so what a key TYPES is decided by the
 OS XKB layout. The 🌐 key switches the OS layout via KDE's KeyboardLayouts DBus and
@@ -15,14 +15,14 @@ import gi, sys, time, os, signal, json, subprocess
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib
 from evdev import UInput, ecodes as e
-GLib.set_prgname("claude-osk")   # app_id so the KWin window-rule can match us
+GLib.set_prgname("handheld-kbd")   # app_id so the KWin window-rule can match us
 
-CFG_DIR = os.path.expanduser("~/.config/claude-osk")
+CFG_DIR = os.path.expanduser("~/.config/handheld-kbd")
 
 # Game Mode (gamescope): render as a transparent, input-capable external overlay
 # instead of a KWin window. Enabled by the daemon when it detects gamescope.
-GAMEMODE = os.environ.get("CLAUDE_KBD_GAMEMODE") == "1"
-GS_DISPLAY = os.environ.get("CLAUDE_KBD_GS_DISPLAY", os.environ.get("DISPLAY", ":0"))
+GAMEMODE = os.environ.get("HANDHELD_KBD_GAMEMODE") == "1"
+GS_DISPLAY = os.environ.get("HANDHELD_KBD_GS_DISPLAY", os.environ.get("DISPLAY", ":0"))
 
 DEFAULT_CONFIG = {
     "layout": "full", "locale": "auto", "opacity": 0.72,
@@ -73,7 +73,7 @@ def load_config():
         with open(os.path.join(CFG_DIR, "config.json")) as f:
             return _deep_merge(DEFAULT_CONFIG, json.load(f))
     except Exception as ex:
-        print(f"claude-osk: using default config ({ex})", file=sys.stderr)
+        print(f"handheld-kbd: using default config ({ex})", file=sys.stderr)
         return dict(DEFAULT_CONFIG)
 
 
@@ -85,7 +85,7 @@ def load_layout(name):
             raise ValueError("no rows")
         return lay
     except Exception as ex:
-        print(f"claude-osk: using default layout ({ex})", file=sys.stderr)
+        print(f"handheld-kbd: using default layout ({ex})", file=sys.stderr)
         return dict(DEFAULT_LAYOUT)
 
 
@@ -135,7 +135,7 @@ def resolve_rows(layout):
             name = k.get("key", "")
             kc = getattr(e, name, None)
             if not isinstance(kc, int):
-                print(f"claude-osk: skipping unknown key '{name}'", file=sys.stderr)
+                print(f"handheld-kbd: skipping unknown key '{name}'", file=sys.stderr)
                 continue
             row.append((k.get("label", name), kc, kind, k.get("shifted", ""), name))
             keys.add(kc)
@@ -171,7 +171,7 @@ class OSK(Gtk.Window):
         self.locale = locale
         self.sfg = config["theme"]["shifted_fg"]
         self.settle = config.get("key_settle_ms", 20) / 1000.0
-        self.ui = UInput({e.EV_KEY: allkeys}, name="claude-osk")
+        self.ui = UInput({e.EV_KEY: allkeys}, name="handheld-kbd")
         self.mods = {}
         self.modbtns = []
         self.keybtns = []        # (button, key_name, base_label, base_shifted) for relabeling
@@ -230,8 +230,8 @@ class OSK(Gtk.Window):
             self.add(outer)
         else:
             self.add(grid)
-        self.set_wmclass("claude-osk", "claude-osk")
-        self.set_title("claude-osk")
+        self.set_wmclass("handheld-kbd", "handheld-kbd")
+        self.set_title("handheld-kbd")
         self.set_decorated(False)
         self.set_skip_taskbar_hint(True)
         self.set_skip_pager_hint(True)
@@ -266,12 +266,12 @@ class OSK(Gtk.Window):
             subprocess.run(["qdbus6", "org.kde.keyboard", "/Layouts",
                             "org.kde.KeyboardLayouts.switchToNextLayout"], timeout=3)
         except Exception as ex:
-            print(f"claude-osk: layout switch failed ({ex})", file=sys.stderr)
+            print(f"handheld-kbd: layout switch failed ({ex})", file=sys.stderr)
         after = active_layout_code()
         if after == before:
             # switch had no effect — extra layouts are configured but not registered
             # yet (KWin reads kxkbrc only at login). Tell the user to log out.
-            try: subprocess.Popen(["claude-osk-relogin"])
+            try: subprocess.Popen(["handheld-kbd-relogin"])
             except Exception: pass
         self.apply_locale(after)
 
@@ -299,9 +299,9 @@ class OSK(Gtk.Window):
     def dismiss(self):
         """Hide button: hide now and tell the mirror daemon to stay hidden until the
         next time the device's keyboard button is pressed (so it doesn't pop right back)."""
-        try: open("/tmp/claude-kbd.suppress", "w").write("1")
+        try: open("/tmp/handheld-kbd.suppress", "w").write("1")
         except Exception: pass
-        try: open("/tmp/claude-kbd.vis", "w").write("0")
+        try: open("/tmp/handheld-kbd.vis", "w").write("0")
         except Exception: pass
         if GAMEMODE:
             self.gm_hide()
@@ -367,7 +367,7 @@ def setup_dbus_trigger(config, toggle):
         from gi.repository import Gio
         bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
     except Exception as ex:
-        print(f"claude-osk: dbus trigger unavailable ({ex})", file=sys.stderr)
+        print(f"handheld-kbd: dbus trigger unavailable ({ex})", file=sys.stderr)
         return
 
     def on_sig(conn, sender, path, iface, signal, params):
@@ -380,7 +380,7 @@ def setup_dbus_trigger(config, toggle):
     bus.signal_subscribe(None, "org.shadowblip.Input.DBusDevice", "InputEvent",
                          None, None, Gio.DBusSignalFlags.NONE, on_sig)
     _dbus_keepalive.append(bus)              # prevent GC of the subscribed connection
-    print(f"claude-osk: dbus trigger listening for {ev}", file=sys.stderr)
+    print(f"handheld-kbd: dbus trigger listening for {ev}", file=sys.stderr)
 
 
 def setup_hotkey(config, toggle):
@@ -417,7 +417,7 @@ def setup_hotkey(config, toggle):
     for path in list_devices():
         try:
             dev = InputDevice(path)
-            if dev.name == "claude-osk":        # skip our own injected-key device
+            if dev.name == "handheld-kbd":        # skip our own injected-key device
                 continue
             if codes <= set(dev.capabilities().get(e.EV_KEY, [])):
                 GLib.io_add_watch(dev.fd, GLib.IO_IN, on_input, dev)
@@ -425,7 +425,7 @@ def setup_hotkey(config, toggle):
         except Exception:
             pass
     if opened == 0:
-        print("claude-osk: hotkey set but no readable input device "
+        print("handheld-kbd: hotkey set but no readable input device "
               "(need 'input' group / udev rule)", file=sys.stderr)
 
 
@@ -437,7 +437,7 @@ def _single_instance():
     catches taps after the visible one hides. Exit silently if already running."""
     global _instance_lock
     import fcntl
-    _instance_lock = open("/tmp/claude-kbd.lock", "w")
+    _instance_lock = open("/tmp/handheld-kbd.lock", "w")
     try:
         fcntl.flock(_instance_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
@@ -455,8 +455,8 @@ def main():
 
     w = OSK(config, rows, allkeys, locale)
     w.connect("destroy", Gtk.main_quit)
-    open("/tmp/claude-kbd.pid", "w").write(str(os.getpid()))
-    VIS = "/tmp/claude-kbd.vis"
+    open("/tmp/handheld-kbd.pid", "w").write(str(os.getpid()))
+    VIS = "/tmp/handheld-kbd.vis"
 
     def _setvis(v):
         try: open(VIS, "w").write(v)
@@ -483,8 +483,8 @@ def main():
     setup_dbus_trigger(config, _toggle)   # seamless hardware-button trigger (InputPlumber)
     setup_hotkey(config, _toggle)         # optional evdev hotkey (attached kbd / Steam Input chord)
 
-    _setvis("1" if os.environ.get("CLAUDE_KBD_SHOW") == "1" else "0")
-    if os.environ.get("CLAUDE_KBD_SHOW") == "1":
+    _setvis("1" if os.environ.get("HANDHELD_KBD_SHOW") == "1" else "0")
+    if os.environ.get("HANDHELD_KBD_SHOW") == "1":
         _show()
     Gtk.main()
 
@@ -492,14 +492,14 @@ def main():
 if __name__ == "__main__":
     import faulthandler, traceback
     try:
-        faulthandler.enable(open("/tmp/claude-kbd-fault.log", "w"))
+        faulthandler.enable(open("/tmp/handheld-kbd-fault.log", "w"))
     except Exception:
         pass
     try:
         main()
     except BaseException:
         try:
-            with open("/tmp/claude-kbd-crash.log", "w") as _f:
+            with open("/tmp/handheld-kbd-crash.log", "w") as _f:
                 traceback.print_exc(file=_f)
         except Exception:
             pass

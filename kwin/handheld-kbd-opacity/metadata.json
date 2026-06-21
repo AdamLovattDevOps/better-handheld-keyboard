@@ -1,0 +1,11 @@
+{
+  "KPlugin": {
+    "Id": "handheld-kbd-opacity",
+    "Name": "Better Handheld Keyboard Opacity",
+    "Description": "Makes the handheld-kbd keyboard translucent",
+    "Version": "1.0",
+    "EnabledByDefault": true
+  },
+  "X-Plasma-API": "javascript",
+  "X-Plasma-MainScript": "code/main.js"
+}

@@ -1,11 +1,11 @@
 #!/bin/bash
-# Claude OSK — tell the user (and optionally trigger) a logout when keyboard-layout
+# Better Handheld Keyboard — tell the user (and optionally trigger) a logout when keyboard-layout
 # config has been changed but not yet applied. KWin/kded only read kxkbrc at session
 # start, so newly-added layouts (e.g. adding 'gb') don't work until a relogin.
 #
-#   claude-osk-relogin            -> if a relogin is pending, show a desktop notification
-#   claude-osk-relogin --prompt   -> if pending, show a Yes/No dialog and log out on Yes
-#   claude-osk-relogin --check    -> exit 0 if a relogin is pending, 1 if not (no UI)
+#   handheld-kbd-relogin            -> if a relogin is pending, show a desktop notification
+#   handheld-kbd-relogin --prompt   -> if pending, show a Yes/No dialog and log out on Yes
+#   handheld-kbd-relogin --check    -> exit 0 if a relogin is pending, 1 if not (no UI)
 export DISPLAY="${DISPLAY:-:0}"
 
 configured=$(kreadconfig6 --file kxkbrc --group Layout --key LayoutList 2>/dev/null | tr ',' '\n' | grep -c .)
@@ -22,10 +22,10 @@ esac
 
 MSG="New keyboard layout(s) won't work until you log out and back in."
 if [ "${1:-}" = "--prompt" ] && command -v kdialog >/dev/null 2>&1; then
-    if kdialog --title "Claude OSK" --yesno "$MSG\n\nLog out now?" \
+    if kdialog --title "Better Handheld Keyboard" --yesno "$MSG\n\nLog out now?" \
                --yes-label "Log out now" --no-label "Later" 2>/dev/null; then
         qdbus6 org.kde.Shutdown /Shutdown org.kde.Shutdown.logout
     fi
 else
-    notify-send -a "Claude OSK" -i input-keyboard "Log out to finish setup" "$MSG" 2>/dev/null
+    notify-send -a "Better Handheld Keyboard" -i input-keyboard "Log out to finish setup" "$MSG" 2>/dev/null
 fi

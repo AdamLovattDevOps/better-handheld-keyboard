@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Better Handheld Keyboard Swap
+Exec=/home/deck/.local/bin/handheld-kbd-swap.sh
+X-GNOME-Autostart-enabled=true

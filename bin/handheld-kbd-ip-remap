@@ -1,14 +1,14 @@
 #!/bin/bash
 # Remap the Legion Go's hardware keyboard button to emit F13 (via InputPlumber)
-# instead of triggering Steam's OSK — so it toggles Claude OSK directly.
+# instead of triggering Steam's OSK — so it toggles Better Handheld Keyboard directly.
 # Builds a profile = InputPlumber's current default with only the "Keyboard" button
 # changed to F13 (everything else untouched), then loads it via DBus (no root needed).
-PROF=/tmp/claude-osk-ip.yaml
+PROF=/tmp/handheld-kbd-ip.yaml
 DEFAULT=/usr/share/inputplumber/profiles/default.yaml
 [ -f "$DEFAULT" ] || exit 0
 # DBus event to remap the keyboard button to (matches config.json dbus_trigger).
 EVENT=$(python3 -c 'import json,os
-try: print(json.load(open(os.path.expanduser("~/.config/claude-osk/config.json"))).get("dbus_trigger") or "ui_osk")
+try: print(json.load(open(os.path.expanduser("~/.config/handheld-kbd/config.json"))).get("dbus_trigger") or "ui_osk")
 except Exception: print("ui_osk")' 2>/dev/null)
 EVENT=${EVENT:-ui_osk}
 
@@ -32,7 +32,7 @@ new = f"""  - name: Keyboard
       - dbus: {sys.argv[3]}"""
 if old not in src:
     sys.exit(1)          # default profile changed shape; bail rather than guess
-open(sys.argv[2], "w").write(src.replace(old, new).replace("name: Default", "name: Claude OSK"))
+open(sys.argv[2], "w").write(src.replace(old, new).replace("name: Default", "name: Better Handheld Keyboard"))
 PY
 [ -f "$PROF" ] || exit 0
 

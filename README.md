@@ -1,4 +1,4 @@
-# Claude OSK
+# Better Handheld Keyboard
 
 A dark, translucent **on-screen keyboard** for SteamOS / KDE Plasma handhelds
 (Steam Deck, Legion Go, ROG Ally) that injects **real hardware keystrokes** via
@@ -23,7 +23,7 @@ Ctrl, Alt, Super, F1–F12, arrows, a full symbol set, and live US/UK switching.
 
 ## Install
 
-**Easy way:** double-click **`Install Claude OSK.desktop`**. A terminal opens,
+**Easy way:** double-click **`Install Better Handheld Keyboard.desktop`**. A terminal opens,
 it copies everything into place, and asks for your password **once** (to grant
 access to `/dev/uinput`, which is how it types). Then **log out and back in**.
 
@@ -51,7 +51,7 @@ The seamless trigger is the InputPlumber DBus event in `dbus_trigger` (default
 
 ## Configure
 
-Everything lives in `~/.config/claude-osk/`:
+Everything lives in `~/.config/handheld-kbd/`:
 
 - **`config.json`**
   - `hotkey` — keys to toggle the keyboard, e.g. `["KEY_LEFTCTRL","KEY_LEFTALT","KEY_K"]` (use any [evdev key names](https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h); `[]` disables)
@@ -87,7 +87,7 @@ leaves your device.
 
 - Nothing happens on the keyboard button → make sure you **logged out and back in**
   after installing (autostart + the InputPlumber remap apply at login).
-- Check the log: `cat /tmp/claude-kbd-out.log` (should say `dbus trigger listening…`).
+- Check the log: `cat /tmp/handheld-kbd-out.log` (should say `dbus trigger listening…`).
 - Missing deps → install `python-gobject` (GTK 3) and `python-evdev`.
 
 ## License
