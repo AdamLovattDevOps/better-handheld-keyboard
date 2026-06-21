@@ -1,0 +1,39 @@
+#!/bin/bash
+# Remap the Legion Go's hardware keyboard button to emit F13 (via InputPlumber)
+# instead of triggering Steam's OSK — so it toggles Claude OSK directly.
+# Builds a profile = InputPlumber's current default with only the "Keyboard" button
+# changed to F13 (everything else untouched), then loads it via DBus (no root needed).
+PROF=/tmp/claude-osk-ip.yaml
+DEFAULT=/usr/share/inputplumber/profiles/default.yaml
+[ -f "$DEFAULT" ] || exit 0
+
+python3 - "$DEFAULT" "$PROF" <<'PY' || exit 0
+import sys
+src = open(sys.argv[1]).read()
+old = """  - name: Keyboard
+    source_event:
+      gamepad:
+        button: Keyboard
+    target_events:
+      - gamepad:
+          button: Guide
+      - gamepad:
+          button: North"""
+new = """  - name: Keyboard
+    source_event:
+      gamepad:
+        button: Keyboard
+    target_events:
+      - keyboard: KeyF13"""
+if old not in src:
+    sys.exit(1)          # default profile changed shape; bail rather than guess
+open(sys.argv[2], "w").write(src.replace(old, new).replace("name: Default", "name: Claude OSK"))
+PY
+[ -f "$PROF" ] || exit 0
+
+# Apply to every InputPlumber composite device (the Legion controller)
+for dev in $(busctl --system tree org.shadowblip.InputPlumber 2>/dev/null \
+             | grep -oE '/org/shadowblip/InputPlumber/CompositeDevice[0-9]+'); do
+    busctl --system call org.shadowblip.InputPlumber "$dev" \
+        org.shadowblip.Input.CompositeDevice LoadProfilePath s "$PROF" 2>/dev/null
+done

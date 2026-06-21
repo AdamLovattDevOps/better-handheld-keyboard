@@ -45,6 +45,12 @@ EOF2
   qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.start 2>&1
 } >>/tmp/swap-startup.log 2>&1
 
+# When not mirroring Steam's OSK, remap the hardware keyboard button → F13 (via
+# InputPlumber) so it toggles Claude OSK directly instead of triggering Steam's OSK.
+if [ "$MIRROR" = 0 ] && [ -x "$HOME/.local/bin/claude-osk-ip-remap" ]; then
+    "$HOME/.local/bin/claude-osk-ip-remap" >/dev/null 2>&1
+fi
+
 opcheck=99   # force an immediate opacity-script check on first loop
 while true; do
     # self-heal: ensure the opacity KWin script stays loaded (its boot-time load

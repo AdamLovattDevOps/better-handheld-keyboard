@@ -39,14 +39,14 @@ then log out and back in.
 to summon the built-in keyboard. This one takes its place automatically. No
 keyboard chord required (you don't have a keyboard — that's the whole point).
 
-**Prefer a controller chord?** (toggles cleanly, no Steam-OSK quirks) Set in `config.json`:
-- `"mirror": false` — stop using Steam's OSK as the trigger
-- `"hotkey": ["KEY_F13"]` — the key the chord will emit (F13 conflicts with nothing)
-
-Then in **Steam Input**, map a button chord (e.g. **RB + X**) to emit **F13**. Now that
-chord toggles the keyboard — show *and* hide — with no Steam-OSK involvement, so the
-hide button works perfectly. (If Steam Input doesn't offer F13, pick any key it does and
-set `hotkey` to match. Needs `/dev/input` read access — the installer's `input` group.)
+**Seamless mode (Legion Go & other InputPlumber handhelds) — recommended.** Set
+`"mirror": false` in `config.json`. The daemon then remaps your **hardware keyboard
+button** (via InputPlumber) to drive *this* keyboard directly — Steam's OSK is taken
+out of the loop entirely. Same button you already press, but now: clean show/hide
+toggle, the on-screen hide button works, no "ghost typing." Nothing to configure in
+Steam Input. (Internally it remaps the button to F13 and the keyboard listens for it;
+change `hotkey` if you want a different key. Falls back gracefully on devices whose
+button InputPlumber doesn't expose.)
 
 ## Configure
 

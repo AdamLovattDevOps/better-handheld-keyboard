@@ -21,6 +21,7 @@ mkdir -p "$BIN" "$CFG/layouts" "$CFG/locales" "$KWIN/contents/code" "$AUTO"
 install -m755 "$HERE/bin/claude-kbd.py"        "$BIN/"
 install -m755 "$HERE/bin/claude-kbd-swap.sh"   "$BIN/"
 install -m755 "$HERE/bin/claude-osk-relogin"   "$BIN/"
+install -m755 "$HERE/bin/claude-osk-ip-remap"  "$BIN/"
 
 # --- config (never clobber the user's edits) ---
 [ -f "$CFG/config.json" ] || install -m644 "$HERE/config/config.json" "$CFG/config.json"
