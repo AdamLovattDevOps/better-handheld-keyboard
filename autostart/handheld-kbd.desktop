@@ -1,5 +1,5 @@
 [Desktop Entry]
 Type=Application
 Name=Better Handheld Keyboard
-Exec=sh -c 'python3 /home/deck/.local/bin/handheld-kbd.py >/tmp/handheld-kbd-out.log 2>&1'
+Exec=sh -c 'python3 __BIN__/handheld-kbd.py >/tmp/handheld-kbd-out.log 2>&1'
 X-GNOME-Autostart-enabled=true

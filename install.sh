@@ -70,9 +70,10 @@ fi
 install -m644 "$HERE/kwin/handheld-kbd-opacity/metadata.json" "$KWIN/metadata.json"
 install -m644 "$HERE/kwin/handheld-kbd-opacity/contents/code/main.js" "$KWIN/contents/code/main.js"
 
-# --- autostart ---
-install -m644 "$HERE/autostart/handheld-kbd.desktop"      "$AUTO/handheld-kbd.desktop"
-install -m644 "$HERE/autostart/handheld-kbd-swap.desktop" "$AUTO/handheld-kbd-swap.desktop"
+# --- autostart (templates carry __BIN__; substitute this user's real path) ---
+sed "s#__BIN__#$BIN#g" "$HERE/autostart/handheld-kbd.desktop"      > "$AUTO/handheld-kbd.desktop"
+sed "s#__BIN__#$BIN#g" "$HERE/autostart/handheld-kbd-swap.desktop" > "$AUTO/handheld-kbd-swap.desktop"
+chmod 644 "$AUTO/handheld-kbd.desktop" "$AUTO/handheld-kbd-swap.desktop"
 
 # --- KWin window rule (pins the keyboard: on top, no focus-steal, bottom-docked) ---
 if command -v kwriteconfig6 >/dev/null 2>&1; then
