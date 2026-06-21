@@ -3,6 +3,8 @@
 > **Heads up:** this is for **Desktop Mode** (KDE Plasma). Game Mode works
 > differently under the hood and isn't covered here.
 
+![Better Handheld Keyboard — translucent, with a full key set, typing into Firefox](docs/screenshot.png)
+
 If you've ever tried to do something *real* on a SteamOS handheld in Desktop
 Mode — open a terminal, use an app with keyboard shortcuts — you've probably hit
 the same wall I did.
