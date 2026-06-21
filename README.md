@@ -35,18 +35,19 @@ then log out and back in.
 
 ## How you bring it up
 
-**Just press your device's keyboard button** — the same hardware button that used
-to summon the built-in keyboard. This one takes its place automatically. No
-keyboard chord required (you don't have a keyboard — that's the whole point).
+**Press your device's keyboard button** — the same hardware button you already use.
+This keyboard appears in its place. Press again to hide. That's it.
 
-**Seamless mode (Legion Go & other InputPlumber handhelds) — recommended.** Set
-`"mirror": false` in `config.json`. The daemon then remaps your **hardware keyboard
-button** (via InputPlumber) to drive *this* keyboard directly — Steam's OSK is taken
-out of the loop entirely. Same button you already press, but now: clean show/hide
-toggle, the on-screen hide button works, no "ghost typing." Nothing to configure in
-Steam Input. (Internally it remaps the button to F13 and the keyboard listens for it;
-change `hotkey` if you want a different key. Falls back gracefully on devices whose
-button InputPlumber doesn't expose.)
+The installer auto-picks the best method for your device:
+- **Seamless** (Legion Go & other InputPlumber handhelds): the keyboard button is
+  remapped to summon *this* keyboard directly — Steam's OSK is out of the loop, so
+  show/hide is clean with no "ghost typing."
+- **Mirror** (other KDE handhelds): when the system on-screen keyboard appears, this
+  one takes its place on top.
+
+To force one, set `"mirror"` in `config.json` (`false` = seamless, `true` = mirror).
+The seamless trigger is the InputPlumber DBus event in `dbus_trigger` (default
+`ui_select`) — change it if it ever collides on your hardware.
 
 ## Configure
 
@@ -82,6 +83,14 @@ The keyboard reads input devices only to detect its activation hotkey — it
 matches one specific combo and ignores everything else. It's all local; nothing
 leaves your device.
 
+## Troubleshooting
+
+- Nothing happens on the keyboard button → make sure you **logged out and back in**
+  after installing (autostart + the InputPlumber remap apply at login).
+- Check the log: `cat /tmp/claude-kbd-out.log` (should say `dbus trigger listening…`).
+- Missing deps → install `python-gobject` (GTK 3) and `python-evdev`.
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
+

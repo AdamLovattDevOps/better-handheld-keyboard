@@ -24,13 +24,31 @@ install -m755 "$HERE/bin/claude-osk-relogin"   "$BIN/"
 install -m755 "$HERE/bin/claude-osk-ip-remap"  "$BIN/"
 
 # --- config (never clobber the user's edits) ---
-[ -f "$CFG/config.json" ] || install -m644 "$HERE/config/config.json" "$CFG/config.json"
+FRESH=0
+if [ ! -f "$CFG/config.json" ]; then install -m644 "$HERE/config/config.json" "$CFG/config.json"; FRESH=1; fi
 for f in "$HERE"/config/layouts/*.json; do
   d="$CFG/layouts/$(basename "$f")"; [ -f "$d" ] || install -m644 "$f" "$d"
 done
 for f in "$HERE"/config/locales/*.json; do
   d="$CFG/locales/$(basename "$f")"; [ -f "$d" ] || install -m644 "$f" "$d"
 done
+
+# --- on a fresh install, auto-pick the trigger mode for this device ---
+# Seamless: if InputPlumber exposes the hardware keyboard button (Legion Go etc.),
+# remap it to summon THIS keyboard directly. Otherwise: mirror Steam's on-screen
+# keyboard (works on any KDE handheld; press the device's keyboard button).
+if [ "$FRESH" = 1 ]; then
+  if grep -q 'button: Keyboard' /usr/share/inputplumber/profiles/default.yaml 2>/dev/null; then
+    say "Seamless mode — your keyboard button will summon this keyboard directly."
+    python3 - "$CFG/config.json" <<'PY'
+import json,sys
+p=sys.argv[1]; d=json.load(open(p)); d['mirror']=False; d['dbus_trigger']='ui_select'
+json.dump(d,open(p,'w'),indent=2)
+PY
+  else
+    say "Mirror mode — this keyboard replaces the system on-screen keyboard."
+  fi
+fi
 
 # --- KWin translucency script ---
 install -m644 "$HERE/kwin/claude-osk-opacity/metadata.json" "$KWIN/metadata.json"

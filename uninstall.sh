@@ -13,9 +13,19 @@ say "Removing program + autostart + KWin script…"
 rm -f "$HOME/.local/bin/claude-kbd.py" \
       "$HOME/.local/bin/claude-kbd-swap.sh" \
       "$HOME/.local/bin/claude-osk-relogin" \
+      "$HOME/.local/bin/claude-osk-ip-remap" \
       "$HOME/.config/autostart/claude-kbd.desktop" \
       "$HOME/.config/autostart/claude-kbd-swap.desktop"
 rm -rf "$HOME/.local/share/kwin/scripts/claude-osk-opacity"
+
+# restore the hardware keyboard button (we remapped it via InputPlumber)
+say "Restoring InputPlumber default profile…"
+for d in $(busctl --system tree org.shadowblip.InputPlumber 2>/dev/null \
+           | grep -oE '/org/shadowblip/InputPlumber/CompositeDevice[0-9]+'); do
+  busctl --system call org.shadowblip.InputPlumber "$d" \
+    org.shadowblip.Input.CompositeDevice LoadProfilePath s \
+    /usr/share/inputplumber/profiles/default.yaml 2>/dev/null
+done
 
 if command -v kwriteconfig6 >/dev/null 2>&1; then
   say "Removing KWin window rule…"

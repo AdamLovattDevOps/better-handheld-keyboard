@@ -1,5 +1,5 @@
 [Desktop Entry]
 Type=Application
 Name=Claude OSK
-Exec=python3 /home/deck/.local/bin/claude-kbd.py
+Exec=sh -c 'python3 /home/deck/.local/bin/claude-kbd.py >/tmp/claude-kbd-out.log 2>&1'
 X-GNOME-Autostart-enabled=true

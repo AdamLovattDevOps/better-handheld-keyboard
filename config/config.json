@@ -34,5 +34,6 @@
   },
   "locale": "auto",
   "hotkey": [],
-  "mirror": true
+  "mirror": true,
+  "dbus_trigger": "ui_select"
 }
