@@ -49,18 +49,22 @@ while true; do
             qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.start >/dev/null 2>&1
         fi
     fi
+    # dismiss latch: the hide button sets this. While set we UNMAP Steam's OSK
+    # (properly dismiss it, so its invisible window can't keep capturing taps) instead
+    # of just hiding it behind ours. Clears once it's gone → next keyboard-button
+    # press re-maps Steam's OSK and we show ours again.
+    supp=0; [ -f /tmp/claude-kbd.suppress ] && supp=1
     steam=0
     for w in $(xwininfo -root -tree 2>/dev/null | grep -i "$NAME" | grep -oE '0x[0-9a-f]+'); do
-        # Hard-hide Steam's OSK: force its X11 window fully transparent. KWin honors
-        # _NET_WM_WINDOW_OPACITY natively, so this can't silently fail the way the
-        # KWin-scripting load can. Applied to every matching window each pass.
-        xprop -id "$w" -f _NET_WM_WINDOW_OPACITY 32c -set _NET_WM_WINDOW_OPACITY 0 2>/dev/null
+        if [ "$supp" = 1 ]; then
+            xdotool windowunmap "$w" 2>/dev/null            # hide button → kill the ghost OSK
+        else
+            # normal mirror: keep Steam's OSK mapped but invisible behind ours.
+            xprop -id "$w" -f _NET_WM_WINDOW_OPACITY 32c -set _NET_WM_WINDOW_OPACITY 0 2>/dev/null
+        fi
         xwininfo -id "$w" 2>/dev/null | grep -q IsViewable && steam=1
     done
     ours=$(cat "$VIS" 2>/dev/null); ours=${ours:-0}
-    # dismiss-suppression: the hide button sets this so we don't immediately re-show.
-    # It clears the moment Steam's OSK goes away → next button press shows ours again.
-    supp=0; [ -f /tmp/claude-kbd.suppress ] && supp=1
     [ "$steam" = 0 ] && { rm -f /tmp/claude-kbd.suppress; supp=0; }
     pid=$(pgrep -f 'python3 .*claude-kbd\.py' | head -1)
     if [ -z "$pid" ]; then
