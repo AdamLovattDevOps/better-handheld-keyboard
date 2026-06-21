@@ -429,7 +429,23 @@ def setup_hotkey(config, toggle):
               "(need 'input' group / udev rule)", file=sys.stderr)
 
 
+_instance_lock = None
+
+
+def _single_instance():
+    """Ensure only ONE keyboard runs — duplicates leave a ghost window that still
+    catches taps after the visible one hides. Exit silently if already running."""
+    global _instance_lock
+    import fcntl
+    _instance_lock = open("/tmp/claude-kbd.lock", "w")
+    try:
+        fcntl.flock(_instance_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        sys.exit(0)
+
+
 def main():
+    _single_instance()
     config = load_config()
     layout = load_layout(config.get("layout", "full"))
     rows, allkeys = resolve_rows(layout)
