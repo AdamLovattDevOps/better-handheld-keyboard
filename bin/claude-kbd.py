@@ -30,9 +30,13 @@ DEFAULT_CONFIG = {
     "key_size": [74, 64], "wide_size": [110, 64], "space_width": 360,
     "key_settle_ms": 20,
     # "mirror": true  → the device's keyboard button summons us (via Steam's OSK).
-    # "mirror": false → drive the keyboard with the hotkey below instead (e.g. a
-    #                   controller chord mapped to it in Steam Input). Read by the daemon.
+    # "mirror": false → seamless mode: the daemon remaps the hardware keyboard button
+    #                   (via InputPlumber) to fire dbus_trigger, which we listen for
+    #                   below. No key emitted = nothing leaks to Steam/KDE. Read by daemon.
     "mirror": True,
+    # InputPlumber DBus event the keyboard button is remapped to / we listen for.
+    # "" = don't use the DBus trigger. (Used when mirror is false.)
+    "dbus_trigger": "ui_osk",
     # Hotkey to TOGGLE the keyboard (evdev key names, pressed together). Used when
     # mirror is off (or as an extra). Map a controller chord to this combo in Steam
     # Input. [] = off. Needs /dev/input read access (installer's udev rule + 'input').
@@ -349,6 +353,36 @@ class OSK(Gtk.Window):
         self._root_touch_mode(self.orig_touch_mode if self.orig_touch_mode is not None else 4)
 
 
+_dbus_keepalive = []   # keep the bus connection alive or the subscription is GC'd
+
+
+def setup_dbus_trigger(config, toggle):
+    """Toggle when InputPlumber fires its configured DBus InputEvent (the hardware
+    keyboard button, remapped to this event). No key is emitted, so nothing leaks to
+    Steam/KDE. This is the seamless trigger on InputPlumber handhelds."""
+    ev = config.get("dbus_trigger") or ""
+    if not ev:
+        return
+    try:
+        from gi.repository import Gio
+        bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+    except Exception as ex:
+        print(f"claude-osk: dbus trigger unavailable ({ex})", file=sys.stderr)
+        return
+
+    def on_sig(conn, sender, path, iface, signal, params):
+        try:
+            name, val = params.unpack()
+        except Exception:
+            return
+        if name == ev and val >= 1.0:        # press only (release = 0.0)
+            toggle()
+    bus.signal_subscribe(None, "org.shadowblip.Input.DBusDevice", "InputEvent",
+                         None, None, Gio.DBusSignalFlags.NONE, on_sig)
+    _dbus_keepalive.append(bus)              # prevent GC of the subscribed connection
+    print(f"claude-osk: dbus trigger listening for {ev}", file=sys.stderr)
+
+
 def setup_hotkey(config, toggle):
     """Watch input devices for the configured hotkey combo and call toggle().
     evdev-level, so it works regardless of which window has focus. Needs read
@@ -430,7 +464,8 @@ def main():
         except Exception: pass
         (_hide if cur == "1" else _show)()
 
-    setup_hotkey(config, _toggle)
+    setup_dbus_trigger(config, _toggle)   # seamless hardware-button trigger (InputPlumber)
+    setup_hotkey(config, _toggle)         # optional evdev hotkey (attached kbd / Steam Input chord)
 
     _setvis("1" if os.environ.get("CLAUDE_KBD_SHOW") == "1" else "0")
     if os.environ.get("CLAUDE_KBD_SHOW") == "1":
