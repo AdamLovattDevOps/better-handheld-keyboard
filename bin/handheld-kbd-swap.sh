@@ -18,37 +18,63 @@ exec 9>/tmp/handheld-kbd-swap.lock
 flock -n 9 || exit 0
 
 OPSCRIPT="$HOME/.local/share/kwin/scripts/handheld-kbd-opacity/contents/code/main.js"
+PROVEN="$HOME/.local/share/handheld-kbd/trigger-proven"
 
 # Regenerate the KWin opacity script from config.json so `opacity` is configurable.
 OP=$(python3 -c 'import json,os
 try: print(float(json.load(open(os.path.expanduser("~/.config/handheld-kbd/config.json")))["opacity"]))
 except Exception: print(0.72)' 2>/dev/null)
 case "$OP" in ''|*[!0-9.]*) OP=0.72 ;; esac
-mkdir -p "$(dirname "$OPSCRIPT")"
-cat > "$OPSCRIPT" <<EOF2
-function setOp(w){
-    try {
-        var c = "" + w.resourceClass;
-        var cap = "" + w.caption;
-        if (c.indexOf("handheld-kbd") !== -1) w.opacity = $OP;
-        else if (cap.indexOf("Steam Input On-screen Keyboard") !== -1) w.opacity = 0.0;
-    } catch(e){}
+
+# Hiding Steam's OSK is only safe once we know ours can actually come up. In mirror mode
+# it can by definition — Steam's OSK is what drives ours. In seamless mode the keyboard
+# touches PROVEN the first time it is shown for real, so until that exists we leave
+# Steam's keyboard alone: a trigger that never fires must degrade to "the stock keyboard",
+# never to "no keyboard at all". (That was the Legion Go 1 case — InputPlumber's default
+# profile carries a 'Keyboard' button mapping on every device, but no Go 1 button emits it.)
+hide_steam_wanted() { { [ "$MIRROR" = 1 ] || [ -f "$PROVEN" ]; } && echo 1 || echo 0; }
+
+write_opscript() {          # $1 = 1 to also force Steam's OSK transparent
+    mkdir -p "$(dirname "$OPSCRIPT")"
+    {
+        echo 'function setOp(w){'
+        echo '    try {'
+        echo '        var c = "" + w.resourceClass;'
+        echo '        var cap = "" + w.caption;'
+        echo "        if (c.indexOf(\"handheld-kbd\") !== -1) w.opacity = $OP;"
+        [ "$1" = 1 ] && echo "        else if (cap.indexOf(\"$NAME\") !== -1) w.opacity = 0.0;"
+        echo '    } catch(e){}'
+        echo '}'
+        echo 'workspace.windowList().forEach(setOp);'
+        echo 'workspace.windowAdded.connect(setOp);'
+    } > "$OPSCRIPT"
 }
-workspace.windowList().forEach(setOp);
-workspace.windowAdded.connect(setOp);
-EOF2
+
+load_opscript() {
+    qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript "handheld-kbd-opacity" >/dev/null 2>&1
+    qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$OPSCRIPT" "handheld-kbd-opacity" >/dev/null 2>&1
+    qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.start >/dev/null 2>&1
+}
+
+HIDE_STEAM=$(hide_steam_wanted)
+write_opscript "$HIDE_STEAM"
 
 {
-  echo "STARTUP $(date) OPSCRIPT=$OPSCRIPT exists=$([ -f "$OPSCRIPT" ] && echo Y || echo N) opacity=$OP"
-  qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript "handheld-kbd-opacity" 2>&1
-  echo "load: $(qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$OPSCRIPT" "handheld-kbd-opacity" 2>&1)"
-  qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.start 2>&1
+  echo "STARTUP $(date) OPSCRIPT=$OPSCRIPT exists=$([ -f "$OPSCRIPT" ] && echo Y || echo N) opacity=$OP mirror=$MIRROR hide_steam=$HIDE_STEAM"
+  load_opscript
 } >>/tmp/swap-startup.log 2>&1
 
-# When not mirroring Steam's OSK, remap the hardware keyboard button → F13 (via
-# InputPlumber) so it toggles Better Handheld Keyboard directly instead of triggering Steam's OSK.
+# Seamless mode: remap the hardware keyboard button (via InputPlumber) so it fires our
+# DBus event instead of triggering Steam's OSK. If that remap can't be applied, fall back
+# to mirror mode for this session — better a keyboard on Steam's trigger than no keyboard.
 if [ "$MIRROR" = 0 ] && [ -x "$HOME/.local/bin/handheld-kbd-ip-remap" ]; then
-    "$HOME/.local/bin/handheld-kbd-ip-remap" >/dev/null 2>&1
+    if ! "$HOME/.local/bin/handheld-kbd-ip-remap" >>/tmp/swap-startup.log 2>&1; then
+        echo "REMAP FAILED $(date) — falling back to mirror mode" >>/tmp/swap-startup.log
+        MIRROR=1
+        HIDE_STEAM=$(hide_steam_wanted)
+        write_opscript "$HIDE_STEAM"
+        load_opscript
+    fi
 fi
 
 opcheck=99   # force an immediate opacity-script check on first loop
@@ -58,7 +84,14 @@ while true; do
     opcheck=$((opcheck+1))
     if [ "$opcheck" -ge 30 ]; then
         opcheck=0
-        if [ "$(qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.isScriptLoaded handheld-kbd-opacity 2>/dev/null)" != "true" ]; then
+        # Seamless mode: the first time the keyboard actually appears, PROVEN shows up and
+        # we may start hiding Steam's OSK. Rewrite + reload the script when that flips.
+        want=$(hide_steam_wanted)
+        if [ "$want" != "$HIDE_STEAM" ]; then
+            HIDE_STEAM=$want
+            write_opscript "$HIDE_STEAM"
+            load_opscript
+        elif [ "$(qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.isScriptLoaded handheld-kbd-opacity 2>/dev/null)" != "true" ]; then
             qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$OPSCRIPT" "handheld-kbd-opacity" >/dev/null 2>&1
             qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.start >/dev/null 2>&1
         fi

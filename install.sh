@@ -38,6 +38,7 @@ install -m755 "$HERE/bin/handheld-kbd.py"        "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-swap.sh"   "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-relogin"   "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-ip-remap"  "$BIN/"
+install -m755 "$HERE/bin/handheld-kbd-recover"   "$BIN/"
 
 # --- config (never clobber the user's edits) ---
 FRESH=0
@@ -50,11 +51,29 @@ for f in "$HERE"/config/locales/*.json; do
 done
 
 # --- on a fresh install, auto-pick the trigger mode for this device ---
-# Seamless: if InputPlumber exposes the hardware keyboard button (Legion Go etc.),
-# remap it to summon THIS keyboard directly. Otherwise: mirror Steam's on-screen
-# keyboard (works on any KDE handheld; press the device's keyboard button).
+# Mirror mode is the default because it works on any KDE handheld: press whatever
+# summons the system on-screen keyboard and ours comes up in its place.
+#
+# Seamless mode remaps the hardware keyboard button via InputPlumber so it drives this
+# keyboard directly. It is only offered on devices that actually HAVE such a button.
+# Do NOT infer that from /usr/share/inputplumber/profiles/default.yaml — that profile
+# ships the same 'button: Keyboard' mapping on every device, so grepping it selected
+# seamless mode on hardware where no button can ever emit the event (Legion Go 1, and a
+# Steam Deck or ROG Ally under Bazzite/ChimeraOS: none of those InputPlumber drivers
+# emit GamepadButton::Keyboard). The result was a dead trigger. Match the device instead.
+SEAMLESS_DMI='83N0 83N1'        # Lenovo Legion Go 2 — has a real keyboard button
+
+seamless_supported() {
+  [ -f /usr/share/inputplumber/profiles/default.yaml ] || return 1
+  command -v busctl >/dev/null 2>&1 || return 1
+  local product
+  product="$(cat /sys/class/dmi/id/product_name 2>/dev/null)" || return 1
+  for m in $SEAMLESS_DMI; do [ "$product" = "$m" ] && return 0; done
+  return 1
+}
+
 if [ "$FRESH" = 1 ]; then
-  if grep -q 'button: Keyboard' /usr/share/inputplumber/profiles/default.yaml 2>/dev/null; then
+  if seamless_supported; then
     say "Seamless mode — your keyboard button will summon this keyboard directly."
     python3 - "$CFG/config.json" <<'PY'
 import json,sys
@@ -63,6 +82,29 @@ json.dump(d,open(p,'w'),indent=2)
 PY
   else
     say "Mirror mode — this keyboard replaces the system on-screen keyboard."
+  fi
+elif ! seamless_supported && python3 -c 'import json,os,sys
+p=os.path.expanduser("~/.config/handheld-kbd/config.json")
+try: sys.exit(0 if json.load(open(p)).get("mirror", True) is False else 1)
+except Exception: sys.exit(1)' 2>/dev/null; then
+  # Repair an existing install that an earlier version put into seamless mode on hardware
+  # that can't drive it. Left alone, the keyboard button does nothing at all.
+  warn "This device is in seamless mode but has no keyboard button that can trigger it."
+  python3 - "$CFG/config.json" <<'PY'
+import json,sys
+p=sys.argv[1]; d=json.load(open(p)); d['mirror']=True
+json.dump(d,open(p,'w'),indent=2)
+PY
+  say "Switched to mirror mode — press whatever opens the Steam keyboard."
+  pkill -f 'handheld-kbd-swap\.sh' 2>/dev/null || true
+  if [ -f /usr/share/inputplumber/profiles/default.yaml ] && command -v busctl >/dev/null 2>&1; then
+    for dev in $(busctl --system tree org.shadowblip.InputPlumber 2>/dev/null \
+                 | grep -oE '/org/shadowblip/InputPlumber/CompositeDevice[0-9]+'); do
+      busctl --system call org.shadowblip.InputPlumber "$dev" \
+        org.shadowblip.Input.CompositeDevice LoadProfilePath s \
+        /usr/share/inputplumber/profiles/default.yaml >/dev/null 2>&1
+    done
+    say "Restored InputPlumber's stock button mapping."
   fi
 fi
 
@@ -124,4 +166,5 @@ say "Done!"
 echo "   • Log out and back in once (activates autostart + permissions)."
 echo "   • Then press your device's keyboard button — this keyboard comes up instead."
 echo "   • Edit ~/.config/handheld-kbd/config.json for opacity, layout, theme, optional hotkey."
+echo "   • No keyboard at all afterwards? Run:  handheld-kbd-recover"
 [ "${PRIV_OK:-0}" = 1 ] || warn "Permission step didn't complete — typing won't work until it does."

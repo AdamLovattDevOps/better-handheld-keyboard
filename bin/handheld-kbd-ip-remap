@@ -34,11 +34,34 @@ if old not in src:
     sys.exit(1)          # default profile changed shape; bail rather than guess
 open(sys.argv[2], "w").write(src.replace(old, new).replace("name: Default", "name: Better Handheld Keyboard"))
 PY
-[ -f "$PROF" ] || exit 0
+if [ ! -f "$PROF" ]; then
+    echo "handheld-kbd: InputPlumber default profile has an unexpected shape — no remap applied" >&2
+    exit 1
+fi
 
-# Apply to every InputPlumber composite device (the Legion controller)
+# Apply to every InputPlumber composite device (the Legion controller), then read the
+# profile name back so a silent failure is visible instead of looking like success.
+applied=0
 for dev in $(busctl --system tree org.shadowblip.InputPlumber 2>/dev/null \
              | grep -oE '/org/shadowblip/InputPlumber/CompositeDevice[0-9]+'); do
     busctl --system call org.shadowblip.InputPlumber "$dev" \
         org.shadowblip.Input.CompositeDevice LoadProfilePath s "$PROF" 2>/dev/null
+    name=$(busctl --system get-property org.shadowblip.InputPlumber "$dev" \
+        org.shadowblip.Input.CompositeDevice ProfileName 2>/dev/null)
+    case "$name" in *"Better Handheld Keyboard"*) applied=$((applied+1)) ;; esac
+
+    # A remap that loads is still useless if the device can't emit the button it rebinds
+    # (Legion Go 1 advertises Gamepad:Button:Keyboard but no physical button sends it).
+    caps=$(busctl --system get-property org.shadowblip.InputPlumber "$dev" \
+        org.shadowblip.Input.CompositeDevice Capabilities 2>/dev/null)
+    case "$caps" in
+        *Keyboard*) : ;;
+        *) echo "handheld-kbd: $dev does not report a keyboard button — the seamless trigger will never fire here" >&2 ;;
+    esac
 done
+
+if [ "$applied" = 0 ]; then
+    echo "handheld-kbd: profile did not load on any InputPlumber device — seamless trigger inactive" >&2
+    exit 1
+fi
+echo "handheld-kbd: seamless profile active on $applied InputPlumber device(s)" >&2

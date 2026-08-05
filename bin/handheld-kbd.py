@@ -432,6 +432,22 @@ def setup_hotkey(config, toggle):
 _instance_lock = None
 
 
+PROVEN = os.path.expanduser("~/.local/share/handheld-kbd/trigger-proven")
+
+
+def _mark_proven():
+    """Record that this keyboard really did come up on this machine.
+
+    The swap daemon only makes Steam's on-screen keyboard transparent once this
+    exists, so a trigger that never fires leaves the stock keyboard usable instead
+    of leaving the user with no keyboard at all."""
+    try:
+        os.makedirs(os.path.dirname(PROVEN), exist_ok=True)
+        open(PROVEN, "w").close()
+    except Exception:
+        pass
+
+
 def _single_instance():
     """Ensure only ONE keyboard runs — duplicates leave a ghost window that still
     catches taps after the visible one hides. Exit silently if already running."""
@@ -466,6 +482,7 @@ def main():
         w.show_all()
         if GAMEMODE:                      # set overlay atoms once gamescope has mapped us
             GLib.timeout_add(250, w.gm_show)
+        _mark_proven()
         _setvis("1"); return True
 
     def _hide(*_):
