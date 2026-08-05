@@ -322,14 +322,6 @@
         "kind": "space"
       },
       {
-        "label": "Home",
-        "key": "KEY_HOME"
-      },
-      {
-        "label": "End",
-        "key": "KEY_END"
-      },
-      {
         "label": "PgUp",
         "key": "KEY_PAGEUP"
       },
