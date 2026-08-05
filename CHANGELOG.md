@@ -9,6 +9,29 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.0.5 — Upgrades that actually upgrade
+
+Two bugs with the same shape: files that were only ever written on a *fresh* install, so
+an upgrade left the system in a state the rest of the code didn't expect.
+
+### Fixed
+
+- **Opacity cycling stopped working after a re-install.** The KWin script had two writers:
+  the installer copied a static `main.js` with `w.opacity` hardcoded to `0.72` and no
+  `var OP` line, while the swap daemon generated a different one that had it. The opacity
+  key patches `var OP`, so against the static copy it silently patched nothing and every
+  reload snapped the keyboard back to `0.72` — the config recorded each step down, the
+  window ignored them. There is now one writer, `bin/handheld-kbd-kwin-script`, shared by
+  the installer, the daemon and the opacity key; the static copy is gone. The key
+  regenerates through it, falling back to patching either historical script shape.
+- **New keys never reached existing installs.** Layouts are only written when absent, so a
+  release could ship the code for a key while the user's layout had no button for it —
+  which is exactly what happened to v1.0.4's ✥. The installer now merges in any action key
+  (`locale`, `hide`, `size`, `opacity`, `move`) the release has and the layout lacks,
+  backing the file up first, and prunes settings that no longer do anything (`dock` and
+  `dock_edges`, from the superseded slot design). Idempotent, and it leaves your own
+  customisations alone.
+
 ## v1.0.4 — Unlock, drag, lock
 
 The v1.0.3 move key cycled through preset docking slots. It didn't work well, so this
