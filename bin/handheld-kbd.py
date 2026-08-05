@@ -862,21 +862,40 @@ class OSK(Gtk.Window):
                               edge, o))
         return slots
 
+    def _clamp_rect(self, rect, out):
+        """Keep a rect inside `out`, whatever the resolution.
+
+        The shipped geometry is sized for a 1280x800 panel, so on anything shorter or
+        narrower the configured rect would hang off the edge — and a Wayland window that
+        is partly outside its output still takes taps while not being fully visible. Sizes
+        shrink to fit first, then the position is pulled back inside. No-op when it
+        already fits, so the usual case is untouched."""
+        if not out:
+            return rect
+        w = max(160, min(rect["w"], out["w"]))
+        h = max(80, min(rect["h"], out["h"]))
+        x = min(max(rect["x"], out["x"]), out["x"] + out["w"] - w)
+        y = min(max(rect["y"], out["y"]), out["y"] + out["h"] - h)
+        return {"x": x, "y": y, "w": w, "h": h}
+
     def _slot_rect(self, g):
         """Window rect for the current dock slot, given the configured size `g`."""
         slots = self._dock_slots()
         self.dock %= len(slots)              # a display went away → wrap into range
         label, edge, out = slots[self.dock]
         if out is None:                      # slot 0: configured position, internal anchor
+            outs = self._outputs()
+            anchor = next((o for o in outs if o["internal"]), outs[0] if outs else None)
             ox, oy = self._panel_origin()
-            return {"x": g["x"] + ox, "y": g["y"] + oy, "w": g["w"], "h": g["h"]}
+            return self._clamp_rect(
+                {"x": g["x"] + ox, "y": g["y"] + oy, "w": g["w"], "h": g["h"]}, anchor)
         w = min(g["w"], out["w"])
         h = min(g["h"], out["h"])
         x = out["x"] + (out["w"] - w) // 2   # centred horizontally on that display
         y = out["y"] + (out["h"] - h) if edge == "bottom" else out["y"]
         if edge == "middle":
             y = out["y"] + (out["h"] - h) // 2
-        return {"x": x, "y": y, "w": w, "h": h}
+        return self._clamp_rect({"x": x, "y": y, "w": w, "h": h}, out)
 
     # ---- Move key (which screen / which edge the keyboard docks to) ----
     def on_move(self, btn):

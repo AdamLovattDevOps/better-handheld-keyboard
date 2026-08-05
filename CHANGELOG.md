@@ -26,6 +26,19 @@ The heading must be `## v<version> — <title>` and the version must match the t
   - the chosen slot persists to `config.json` as `dock`, and the key's label shows the
     edge — plus the display name once there's more than one to choose from
 
+### Fixed
+
+- **Works on any panel resolution.** Every rect — including the configured one — is now
+  clamped to the display it's going onto: sizes shrink to fit, then the position is pulled
+  back inside. The shipped geometry is sized for a 1280×800 Steam Deck, so on a 1280×720
+  panel it used to hang 78px off the bottom, and a partly-off-screen Wayland window still
+  takes taps while not being fully visible. No-op where it already fits, so the Deck and
+  the Legion Go 2 are unchanged.
+- **The installer sizes for the panel it's on.** On a fresh install, `geometry` and
+  `big_geometry` are derived from the internal display (full width, 55% / 64% height,
+  bottom-docked) instead of assuming 1280×800, and the forced KWin rule is written from
+  that geometry rather than a hardcoded `0,378 1280,422`. Existing configs are left alone.
+
 ### Changed
 
 - Display enumeration moved into one `_outputs()` helper (name, position, current-mode
