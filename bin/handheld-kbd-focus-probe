@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""Diagnostic: watch text-field focus via BOTH AT-SPI and KWin's VirtualKeyboard.
+
+Run it in your own session, then tap into text fields in real apps (browser bar,
+KWrite, terminal, Discover search, a chat box...). Each line printed = a focus
+signal we could hang "show-on-focus" off. Ctrl+C when done and share the output.
+
+    handheld-kbd-focus-probe          # runs until Ctrl+C
+"""
+import os, sys, gi
+gi.require_version("Atspi", "2.0")
+from gi.repository import Atspi, GLib, Gio
+import subprocess
+
+# AT-SPI in some sessions can't auto-find the running a11y bus; point it there.
+if not os.environ.get("AT_SPI_BUS_ADDRESS"):
+    try:
+        addr = subprocess.check_output(
+            ["qdbus6", "org.a11y.Bus", "/org/a11y/bus", "org.a11y.Bus.GetAddress"],
+            text=True, timeout=3).strip()
+        if addr:
+            os.environ["AT_SPI_BUS_ADDRESS"] = addr
+    except Exception as ex:
+        print(f"(couldn't fetch a11y bus address: {ex})", file=sys.stderr)
+
+EDITABLE = {Atspi.Role.ENTRY, Atspi.Role.TEXT, Atspi.Role.PASSWORD_TEXT,
+            Atspi.Role.DOCUMENT_TEXT, Atspi.Role.TERMINAL, Atspi.Role.DOCUMENT_FRAME}
+n = {"atspi": 0, "kwin": 0}
+
+
+def on_focus(ev):
+    try:
+        acc = ev.source
+        st = acc.get_state_set()
+        editable = st.contains(Atspi.StateType.EDITABLE) or acc.get_role() in EDITABLE
+        if ev.detail1 == 1:      # gained focus
+            try: app = acc.get_application().get_name()
+            except Exception: app = "?"
+            tag = "EDITABLE" if editable else "focus"
+            n["atspi"] += editable
+            print(f"[AT-SPI/{tag}] role={acc.get_role_name()} app={app}", flush=True)
+    except Exception:
+        pass
+
+
+def on_props(conn, sender, path, iface, sig, params):
+    try:
+        _, changed, _ = params.unpack()
+        keys = [k for k in ("active", "activeClientSupportsTextInput", "visible") if k in changed]
+        if keys:
+            n["kwin"] += 1
+            print(f"[KWin] {{ {', '.join(f'{k}={changed[k]}' for k in keys)} }}", flush=True)
+    except Exception:
+        pass
+
+
+def main():
+    Atspi.EventListener.new(on_focus).register("object:state-changed:focused")
+    bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    bus.signal_subscribe("org.kde.KWin", "org.freedesktop.DBus.Properties",
+                         "PropertiesChanged", "/VirtualKeyboard", None,
+                         Gio.DBusSignalFlags.NONE, on_props)
+    print(">>> Watching focus on BOTH sensors. Tap into text fields in real apps.", flush=True)
+    print(">>> Ctrl+C when done.\n", flush=True)
+    try:
+        GLib.MainLoop().run()
+    except KeyboardInterrupt:
+        print(f"\n\nsummary: AT-SPI editable-focus events={n['atspi']}  KWin change events={n['kwin']}")
+
+
+if __name__ == "__main__":
+    main()

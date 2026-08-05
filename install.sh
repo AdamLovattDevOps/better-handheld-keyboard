@@ -39,6 +39,14 @@ install -m755 "$HERE/bin/handheld-kbd-swap.sh"   "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-relogin"   "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-ip-remap"  "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-recover"   "$BIN/"
+install -m755 "$HERE/bin/handheld-kbd-build-dict" "$BIN/"
+install -m755 "$HERE/bin/handheld-kbd-focus-probe" "$BIN/"
+install -m755 "$HERE/bin/handheld-kbd-resume.sh"  "$BIN/"
+install -m755 "$HERE/bin/handheld-kbd-resume-watch.sh" "$BIN/"
+install -m755 "$HERE/bin/handheld-kbd-resume-watch.py" "$BIN/"
+# imported by handheld-kbd.py (prediction + swipe engines), not run directly
+install -m644 "$HERE/bin/handheld_kbd_predict.py" "$BIN/"
+install -m644 "$HERE/bin/handheld_kbd_swipe.py"   "$BIN/"
 
 # --- config (never clobber the user's edits) ---
 FRESH=0
@@ -115,7 +123,8 @@ install -m644 "$HERE/kwin/handheld-kbd-opacity/contents/code/main.js" "$KWIN/con
 # --- autostart (templates carry __BIN__; substitute this user's real path) ---
 sed "s#__BIN__#$BIN#g" "$HERE/autostart/handheld-kbd.desktop"      > "$AUTO/handheld-kbd.desktop"
 sed "s#__BIN__#$BIN#g" "$HERE/autostart/handheld-kbd-swap.desktop" > "$AUTO/handheld-kbd-swap.desktop"
-chmod 644 "$AUTO/handheld-kbd.desktop" "$AUTO/handheld-kbd-swap.desktop"
+sed "s#__BIN__#$BIN#g" "$HERE/autostart/handheld-kbd-resume.desktop"   > "$AUTO/handheld-kbd-resume.desktop"
+chmod 644 "$AUTO/handheld-kbd.desktop" "$AUTO/handheld-kbd-swap.desktop" "$AUTO/handheld-kbd-resume.desktop"
 
 # --- KWin window rule (pins the keyboard: on top, no focus-steal, bottom-docked) ---
 if command -v kwriteconfig6 >/dev/null 2>&1; then
@@ -167,4 +176,8 @@ echo "   • Log out and back in once (activates autostart + permissions)."
 echo "   • Then press your device's keyboard button — this keyboard comes up instead."
 echo "   • Edit ~/.config/handheld-kbd/config.json for opacity, layout, theme, optional hotkey."
 echo "   • No keyboard at all afterwards? Run:  handheld-kbd-recover"
+echo
+say "Predictive text works from what you type straight away. For corpus-backed"
+say "suggestions from the first keypress, build the dictionary once:"
+echo "     handheld-kbd-build-dict"
 [ "${PRIV_OK:-0}" = 1 ] || warn "Permission step didn't complete — typing won't work until it does."

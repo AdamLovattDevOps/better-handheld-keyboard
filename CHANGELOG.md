@@ -9,6 +9,49 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.1.0 — Predictive text and a bigger keyboard
+
+Everything from v1.0.1 stays: the trigger detection fix, the fail-visible KWin rule, the
+recovery script. This adds the features that had been living on my own Legion Go 2.
+
+### Added
+
+- **Predictive text.** A row of tappable suggestions above the keys, backed by
+  `handheld_kbd_predict.py`. Learns the words you commit (`predict_learn`, stored in
+  `~/.local/share/handheld-kbd/learned.json`, never leaves the device) and blends that
+  with corpus frequencies built once by the new `handheld-kbd-build-dict`. Tapping a
+  suggestion erases the partial word and types the full one as real keystrokes, so it
+  works in any application. Falls back to a plain keyboard if the engine or its data is
+  missing, and off entirely with `"prediction": false`.
+- **Big mode.** A `size` key (⤢) toggles between `geometry` and the new `big_geometry`,
+  stretching every key to fill the window and rewriting the KWin rule live — no relogin.
+  `start_big` comes up in it.
+- **Opacity cycling.** An `opacity` key (◐) steps through `opacity_steps` and persists
+  the choice, instead of editing JSON to see what's behind the keyboard.
+- **Swipe typing.** Drag across the letters to type a word (`handheld_kbd_swipe.py`).
+  A drag only counts once it travels `swipe_min_travel` key-widths and crosses
+  `swipe_min_keys` distinct letters, so ordinary taps are untouched. Runner-up decodings
+  appear in the suggestion row.
+- **Two more ways to summon it.** `gesture_summon` shows the keyboard on a two-finger
+  swipe up from the bottom edge of the touchscreen; `show_on_focus` shows it whenever a
+  text field takes focus, via AT-SPI (`handheld-kbd-focus-probe` helps identify what the
+  bridge reports). Both show-only and both off by default.
+- **Resume handling.** `handheld-kbd-resume-watch.py` listens for logind's
+  `PrepareForSleep` and re-initialises the keyboard on wake, fixing a stale trigger or
+  uinput handle after sleep. Installed as an autostart entry.
+- **Multi-display docking.** The window anchors to the internal panel (`internal_output`,
+  auto-detecting `eDP*`) so an external display doesn't drag the keyboard off-screen.
+
+### Changed
+
+- The KWin script now also keeps the keyboard above fullscreen windows (temporarily
+  dropping the fullscreen window to `keepBelow`, restored afterwards) and re-asserts
+  focus on the window you were actually typing into when the keyboard maps.
+- `full.json` gains the ◐ and ⤢ keys.
+
+Prediction data (`unigrams.txt`, `bigrams.txt`, `learned.json`, `raw/`) is generated on
+device and git-ignored — the repo ships the builder, not the data.
+
 ## v1.0.1 — Legion Go 1 keyboard recovery
 
 **If you installed v1.0.0 on a Legion Go 1 — or on a Steam Deck or ROG Ally running Bazzite

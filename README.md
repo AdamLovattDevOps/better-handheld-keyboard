@@ -29,6 +29,22 @@ So I built the keyboard I wanted instead. Here's what it does differently:
   all live in a JSON file. No code to touch.
 - **US / UK layouts.** A 🌐 key flips the layout so `£`, `@`, `#`, `"` land where
   they should.
+- **Predictive text.** A row of tappable suggestions above the keys. It learns
+  what *you* type, and `handheld-kbd-build-dict` adds corpus frequencies so it's
+  useful from the first keypress. Tapping a suggestion types it as real keys, so
+  it works in any app. Off with `"prediction": false`.
+- **Two sizes.** The ⤢ key toggles between the normal keyboard and a taller one
+  with bigger keys — thumbs on a 7-inch panel, or precision when you're docked.
+  Toggles live, no relogin.
+- **Cycle transparency from the keyboard.** The ◐ key steps through
+  `opacity_steps` instead of making you edit JSON to see what's underneath.
+- **Swipe typing.** Drag across the letters instead of tapping them. Taps are
+  unaffected — a drag only counts once it's unmistakably not one.
+- **Optional summon gestures.** Two-finger swipe up from the bottom edge
+  (`gesture_summon`), or auto-show whenever a text field takes focus
+  (`show_on_focus`, via AT-SPI). Both off by default.
+- **Survives sleep and fullscreen.** It re-initialises after resume, and stays
+  visible above fullscreen windows instead of disappearing behind them.
 
 ## Install
 
@@ -72,6 +88,24 @@ rather matters when you have no keyboard.
 
 Want out entirely? `handheld-kbd-recover --stock-only` stands everything down and hands the
 desktop back to Steam's keyboard.
+
+## Predictive text
+
+Prediction works out of the box from what you type. For suggestions that are useful
+before it has learned anything, build the corpus data once:
+
+```bash
+handheld-kbd-build-dict
+```
+
+That writes `unigrams.txt` and `bigrams.txt` into `~/.local/share/handheld-kbd/`. It
+prefers Peter Norvig's `count_1w.txt` / `count_2w.txt` if you drop them in
+`~/.local/share/handheld-kbd/raw/`, and falls back to the system aspell dictionary
+when offline. Re-runnable, and it never touches `learned.json` — that's your personal
+vocabulary, stays on the device, and is in `.gitignore` for a reason.
+
+Turn learning off with `"predict_learn": false` (corpus only), or prediction entirely
+with `"prediction": false`.
 
 ## Configure
 
