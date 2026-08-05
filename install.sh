@@ -54,6 +54,70 @@ if [ ! -f "$CFG/config.json" ]; then install -m644 "$HERE/config/config.json" "$
 for f in "$HERE"/config/layouts/*.json; do
   d="$CFG/layouts/$(basename "$f")"; [ -f "$d" ] || install -m644 "$f" "$d"
 done
+
+# --- upgrade an existing install: add new keys, drop retired settings ---
+# Layouts and config are never clobbered, so an upgrade used to ship the CODE for a new
+# key while the user's layout kept no button for it — the feature simply never appeared.
+# Merge in any action key this release has that their layout lacks, and drop settings that
+# no longer do anything. Both are best-effort: a failure here must not fail the install.
+python3 - "$HERE/config" "$CFG" <<'PY' || warn "Layout/config upgrade skipped (see above)."
+import json, os, shutil, sys
+
+SRC, DST = sys.argv[1], sys.argv[2]
+ACTION_KINDS = {"locale", "hide", "size", "opacity", "move"}
+RETIRED = ("dock", "dock_edges")          # v1.0.3's docking slots, replaced by unlock/drag
+
+def load(p):
+    with open(p) as f:
+        return json.load(f)
+
+def save(p, data):
+    tmp = p + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    os.replace(tmp, p)
+
+for name in sorted(os.listdir(os.path.join(SRC, "layouts"))):
+    if not name.endswith(".json"):
+        continue
+    sp, dp = os.path.join(SRC, "layouts", name), os.path.join(DST, "layouts", name)
+    if not os.path.exists(dp):
+        continue
+    try:
+        shipped, mine = load(sp), load(dp)
+    except Exception as ex:
+        print(f"handheld-kbd: skipping {name} ({ex})", file=sys.stderr)
+        continue
+    have = {k.get("kind") for row in mine.get("rows", []) for k in row}
+    added = []
+    for ri, row in enumerate(shipped.get("rows", [])):
+        for ki, key in enumerate(row):
+            kind = key.get("kind")
+            if kind not in ACTION_KINDS or kind in have:
+                continue
+            # same row if the layout still has one, else the first row; same offset if it fits
+            target = mine["rows"][ri] if ri < len(mine.get("rows", [])) else mine["rows"][0]
+            target.insert(min(ki, len(target)), dict(key))
+            have.add(kind)
+            added.append(key.get("label") or kind)
+    if added:
+        shutil.copy(dp, dp + ".bak")
+        save(dp, mine)
+        print(f"handheld-kbd: added {' '.join(added)} to {name}")
+
+cfg = os.path.join(DST, "config.json")
+try:
+    mine = load(cfg)
+    gone = [k for k in RETIRED if k in mine]
+    if gone:
+        for k in gone:
+            mine.pop(k, None)
+        save(cfg, mine)
+        print(f"handheld-kbd: removed retired setting(s): {', '.join(gone)}")
+except Exception as ex:
+    print(f"handheld-kbd: config tidy skipped ({ex})", file=sys.stderr)
+PY
 for f in "$HERE"/config/locales/*.json; do
   d="$CFG/locales/$(basename "$f")"; [ -f "$d" ] || install -m644 "$f" "$d"
 done
@@ -158,8 +222,13 @@ PY
 fi
 
 # --- KWin translucency script ---
+# Generated, never copied: a static copy used to be installed here and it diverged from
+# what the daemon writes and what the opacity key patches (it hardcoded 0.72 and had no
+# `var OP` line, so cycling opacity silently did nothing after a re-install).
 install -m644 "$HERE/kwin/handheld-kbd-opacity/metadata.json" "$KWIN/metadata.json"
-install -m644 "$HERE/kwin/handheld-kbd-opacity/contents/code/main.js" "$KWIN/contents/code/main.js"
+install -m755 "$HERE/bin/handheld-kbd-kwin-script" "$BIN/"
+"$BIN/handheld-kbd-kwin-script" --out "$KWIN/contents/code/main.js" || \
+  warn "Could not write the KWin opacity script."
 
 # --- autostart (templates carry __BIN__; substitute this user's real path) ---
 sed "s#__BIN__#$BIN#g" "$HERE/autostart/handheld-kbd.desktop"      > "$AUTO/handheld-kbd.desktop"
