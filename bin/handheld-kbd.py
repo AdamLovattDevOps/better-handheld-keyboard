@@ -48,13 +48,10 @@ DEFAULT_CONFIG = {
     # The window position is offset by this output's origin. "" = auto-detect eDP* (the
     # internal panel). Only matters with 2+ displays; single-display is unaffected.
     "internal_output": "",
-    # Where the keyboard sits. A move key (kind "move") steps through the slots: 0 is the
-    # configured geometry above, then one slot per (display, edge) pair with the internal
-    # panel first. Use it when the keyboard shouldn't be pinned to the bottom, when an
-    # external monitor has left it docked to the wrong screen, or when a forced position
-    # gets stuck — the key rewrites the KWin rule even if the rect looks unchanged.
-    "dock": 0,
-    "dock_edges": ["bottom", "top", "middle"],
+    # The move key (kind "move") unlocks the keyboard: KWin stops forcing its position and
+    # size, a drag bar appears, and you put it where you want — any edge, any display, any
+    # size. Pressing it again locks it there and saves the result back to `geometry`.
+    "handle_height": 30,
     # "mirror": true  → the device's keyboard button summons us (via Steam's OSK).
     # "mirror": false → seamless mode: the daemon remaps the hardware keyboard button
     #                   (via InputPlumber) to fire dbus_trigger, which we listen for
@@ -216,6 +213,10 @@ button.suggest:active {{ background: {t['key_active']}; }}
 button.suggest-empty {{ background: transparent; border-color: transparent; }}
 window.gm {{ background-color: rgba(0,0,0,0); }}
 .gm-keys {{ background-color: rgba(12,12,12,0.82); }}
+.handle-drag {{ background: {t['mod_on_bg']}; }}
+.handle-drag label {{ color: {t['mod_on_fg']}; font-weight: bold; }}
+.handle-grip {{ background: {t['key_active']}; padding: 0 14px; }}
+.handle-grip label {{ color: #ffffff; font-weight: bold; font-size: 18px; }}
 """.encode()
 
 
@@ -239,8 +240,10 @@ class OSK(Gtk.Window):
         self.opacity_btn = None
         self.move_btn = None
         self.big = bool(config.get("start_big", False))
-        # Which docking slot we're in; 0 = exactly the configured geometry (see _dock_slots).
-        self.dock = max(0, int(config.get("dock", 0)))
+        # Unlocked = KWin's rule is on Remember, so the user can drag/resize by hand.
+        # Always starts locked; an unlocked keyboard that got respawned would drift.
+        self.unlocked = False
+        self.handle = None
         self.norm_kh = config["key_size"][1]
         self.nrows = max(1, len(rows))
         prov = Gtk.CssProvider(); prov.load_from_data(build_css(config["theme"]))
@@ -295,6 +298,9 @@ class OSK(Gtk.Window):
                 grid.attach(b, col, ri, sp, 1)
                 col += sp
         self._init_prediction(rows)
+        # Drag/resize bar, hidden until the move key unlocks the keyboard.
+        self.handle = self._build_handle()
+        self.handle.set_no_show_all(True)
         self.orig_touch_mode = None
         if GAMEMODE:
             # Transparent fullscreen overlay: gamescope fullscreens us, the game shows
@@ -313,13 +319,14 @@ class OSK(Gtk.Window):
                 outer.pack_start(self.sugbar, False, False, 0)
             outer.pack_end(grid, False, False, 0)
             self.add(outer)
-        elif self.sugbar is not None:
+        else:
+            # handle bar (hidden while locked) → suggestions → keys
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-            box.pack_start(self.sugbar, False, False, 0)
+            box.pack_start(self.handle, False, False, 0)
+            if self.sugbar is not None:
+                box.pack_start(self.sugbar, False, False, 0)
             box.pack_start(grid, True, True, 0)
             self.add(box)
-        else:
-            self.add(grid)
         self.set_wmclass("handheld-kbd", "handheld-kbd")
         self.set_title("handheld-kbd")
         self.set_decorated(False)
@@ -793,12 +800,11 @@ class OSK(Gtk.Window):
         # the bottom) — the taller key rows above already grow the strip, no resize/rule.
         if GAMEMODE:
             return
-        rect = self._slot_rect(g)            # configured spot, or wherever the move key put us
+        rect = self._slot_rect(g)
         self.resize(rect["w"], rect["h"])
         self.move(rect["x"], rect["y"])
-        self._apply_kwin_geometry(rect)
-        if self.move_btn:
-            self._set_label(self.move_btn, self._move_label(), "")
+        if not self.unlocked:                # unlocked: the user is placing it by hand
+            self._apply_kwin_geometry(rect)
 
     def _outputs(self):
         """Enabled displays as [{name, x, y, w, h, internal}], the internal panel first.
@@ -844,23 +850,125 @@ class OSK(Gtk.Window):
         m = next((o for o in outs if o["internal"]), None)
         return (m["x"], m["y"]) if m else (0, 0)
 
-    def _dock_slots(self):
-        """Places the move key can put the keyboard, in cycle order.
+    # ---- Unlock / drag / lock ----
+    def _set_rule_mode(self, mode):
+        """Set our KWin rule's position/size mode: 2 = Force, 4 = Remember.
 
-        Slot 0 is always the configured geometry anchored to the internal panel — i.e.
-        exactly where the keyboard has always sat, so the default is unchanged. After
-        that comes one slot per (display, edge) pair, internal display first, which is
-        what makes the keyboard reachable when it's docked to the wrong screen or an
-        external monitor has shifted the coordinate space under it.
+        Forced is the normal state — it keeps the keyboard docked and stops anything
+        nudging it. Remember lets the user drag and resize it freely, and KWin writes
+        wherever they leave it straight back into kwinrulesrc, which is how we read the
+        result afterwards (a Wayland client can't ask where its own window is)."""
+        rid = self.cfg.get("kwin_rule_id", "")
+        if not rid:
+            return False
+        try:
+            for key in ("positionrule", "sizerule"):
+                subprocess.run(["kwriteconfig6", "--file", "kwinrulesrc", "--group", rid,
+                                "--key", key, str(mode)], check=False, timeout=3)
+            subprocess.run(["qdbus6", "org.kde.KWin", "/KWin", "reconfigure"],
+                           check=False, timeout=3)
+            return True
+        except Exception as ex:
+            print(f"handheld-kbd: rule mode {mode} failed ({ex})", file=sys.stderr)
+            return False
 
-        Returns [(label, edge, output_or_None)]; resolved live so hotplugging a display
-        changes the cycle without a restart."""
-        slots = [("dock", "configured", None)]
-        for o in self._outputs():
-            for edge in self.cfg.get("dock_edges", DEFAULT_CONFIG["dock_edges"]):
-                slots.append((o["name"] or ("internal" if o["internal"] else "external"),
-                              edge, o))
-        return slots
+    def _read_rule_geometry(self):
+        """What KWin remembered while we were unlocked: {"x","y","w","h"} or None."""
+        rid = self.cfg.get("kwin_rule_id", "")
+        if not rid:
+            return None
+        try:
+            def read(key):
+                return subprocess.check_output(
+                    ["kreadconfig6", "--file", "kwinrulesrc", "--group", rid, "--key", key],
+                    text=True, timeout=3).strip()
+            px, py = (int(v) for v in read("position").split(",", 1))
+            sw, sh = (int(v) for v in read("size").split(",", 1))
+            if sw < 160 or sh < 80:
+                return None
+            return {"x": px, "y": py, "w": sw, "h": sh}
+        except Exception:
+            return None
+
+    def on_move(self, btn):
+        """Toggle between locked (docked, forced) and unlocked (drag it anywhere)."""
+        if self._stray_tap():
+            return
+        if GAMEMODE:
+            # gamescope draws us as a fullscreen overlay — there is no window to drag.
+            print("handheld-kbd: move/lock is Desktop Mode only", file=sys.stderr)
+            return
+        self.unlocked = not self.unlocked
+        if self.unlocked:
+            self._set_rule_mode(4)              # Remember: KWin lets it be moved/resized
+        else:
+            g = self._read_rule_geometry()      # whatever the user dragged it to
+            if g:
+                outs = self._outputs()
+                anchor = next((o for o in outs if o["internal"]), outs[0] if outs else None)
+                g = self._clamp_rect(g, anchor)
+                ox, oy = self._panel_origin()   # geometry is stored panel-relative
+                self.cfg["geometry"] = {"x": g["x"] - ox, "y": g["y"] - oy,
+                                        "w": g["w"], "h": g["h"]}
+                self._persist("geometry", self.cfg["geometry"])
+                self._last_rect = None          # so the re-force definitely writes
+            self._set_rule_mode(2)              # Force it to stay where they put it
+            self.apply_size()
+        self._apply_handle()
+
+    def _apply_handle(self):
+        """Show the drag bar and resize grips only while unlocked, and relabel the key."""
+        if self.handle is not None:
+            if self.unlocked:
+                self.handle.set_no_show_all(False)
+                self.handle.show_all()       # the bar was never shown, so show its children
+            else:
+                self.handle.hide()
+                self.handle.set_no_show_all(True)
+        if self.move_btn:
+            self._set_label(self.move_btn, "🔒" if self.unlocked else "✥", "")
+            ctx = self.move_btn.get_style_context()
+            (ctx.add_class if self.unlocked else ctx.remove_class)("mod-on")
+
+    def _build_handle(self):
+        """A thin bar: drag anywhere along it to move, use either end to resize.
+
+        A Wayland client can't place itself, so both gestures hand off to the compositor
+        (begin_move_drag / begin_resize_drag) — the same mechanism a titlebar uses."""
+        bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        bar.set_size_request(-1, int(self.cfg.get("handle_height", 30)))
+
+        def grip(edge, label):
+            ev = Gtk.EventBox()
+            ev.add(Gtk.Label(label=label))
+            ev.get_style_context().add_class("handle-grip")
+            ev.connect("button-press-event", self._on_resize_press, edge)
+            return ev
+
+        drag = Gtk.EventBox()
+        drag.add(Gtk.Label(label="⇕  drag to move  ⇕"))
+        drag.get_style_context().add_class("handle-drag")
+        drag.connect("button-press-event", self._on_drag_press)
+        bar.pack_start(grip(Gdk.WindowEdge.NORTH_WEST, "⤡"), False, False, 0)
+        bar.pack_start(drag, True, True, 0)
+        bar.pack_start(grip(Gdk.WindowEdge.NORTH_EAST, "⤢"), False, False, 0)
+        return bar
+
+    def _on_drag_press(self, widget, event):
+        try:
+            self.begin_move_drag(event.button, int(event.x_root), int(event.y_root),
+                                 event.time)
+        except Exception as ex:
+            print(f"handheld-kbd: move drag failed ({ex})", file=sys.stderr)
+        return True
+
+    def _on_resize_press(self, widget, event, edge):
+        try:
+            self.begin_resize_drag(edge, event.button, int(event.x_root),
+                                   int(event.y_root), event.time)
+        except Exception as ex:
+            print(f"handheld-kbd: resize drag failed ({ex})", file=sys.stderr)
+        return True
 
     def _clamp_rect(self, rect, out):
         """Keep a rect inside `out`, whatever the resolution.
@@ -879,48 +987,13 @@ class OSK(Gtk.Window):
         return {"x": x, "y": y, "w": w, "h": h}
 
     def _slot_rect(self, g):
-        """Window rect for the current dock slot, given the configured size `g`."""
-        slots = self._dock_slots()
-        self.dock %= len(slots)              # a display went away → wrap into range
-        label, edge, out = slots[self.dock]
-        if out is None:                      # slot 0: configured position, internal anchor
-            outs = self._outputs()
-            anchor = next((o for o in outs if o["internal"]), outs[0] if outs else None)
-            ox, oy = self._panel_origin()
-            return self._clamp_rect(
-                {"x": g["x"] + ox, "y": g["y"] + oy, "w": g["w"], "h": g["h"]}, anchor)
-        w = min(g["w"], out["w"])
-        h = min(g["h"], out["h"])
-        x = out["x"] + (out["w"] - w) // 2   # centred horizontally on that display
-        y = out["y"] + (out["h"] - h) if edge == "bottom" else out["y"]
-        if edge == "middle":
-            y = out["y"] + (out["h"] - h) // 2
-        return self._clamp_rect({"x": x, "y": y, "w": w, "h": h}, out)
-
-    # ---- Move key (which screen / which edge the keyboard docks to) ----
-    def on_move(self, btn):
-        """Step to the next docking slot. Also the way out of a wedged position: it
-        forces the KWin rule to be rewritten even when the rect hasn't changed."""
-        if self._stray_tap():
-            return
-        slots = self._dock_slots()
-        self.dock = (self.dock + 1) % len(slots)
-        self._persist("dock", self.dock)
-        self._last_rect = None               # force the rule write even if unchanged
-        self.apply_size()
-
-    def _move_label(self):
-        """Short label for the move key: the edge, plus the display when there's a choice."""
-        slots = self._dock_slots()
-        if not slots:
-            return "✥"
-        name, edge, out = slots[self.dock % len(slots)]
-        if out is None:
-            return "✥"
-        arrow = {"bottom": "✥↓", "top": "✥↑", "middle": "✥•"}.get(edge, "✥")
-        multi = len([s for s in slots if s[2] is not None]) > len(
-            self.cfg.get("dock_edges", DEFAULT_CONFIG["dock_edges"]))
-        return f"{arrow} {name}" if multi else arrow
+        """Window rect for the configured geometry, anchored to the internal panel and
+        clamped to it, so it lands on-screen whatever the resolution."""
+        outs = self._outputs()
+        anchor = next((o for o in outs if o["internal"]), outs[0] if outs else None)
+        ox, oy = self._panel_origin()
+        return self._clamp_rect(
+            {"x": g["x"] + ox, "y": g["y"] + oy, "w": g["w"], "h": g["h"]}, anchor)
 
     def _apply_kwin_geometry(self, g):
         """Rewrite our KWin window-rule's forced position/size so it follows the toggle

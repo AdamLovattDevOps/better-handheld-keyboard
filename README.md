@@ -38,11 +38,11 @@ So I built the keyboard I wanted instead. Here's what it does differently:
   Toggles live, no relogin.
 - **Cycle transparency from the keyboard.** The ◐ key steps through
   `opacity_steps` instead of making you edit JSON to see what's underneath.
-- **Move it.** The ✥ key steps the keyboard between docking spots: bottom, top,
-  middle, and the same on every attached display. Handy when the bottom edge is
-  where the thing you're typing into lives, when an external monitor has left the
-  keyboard on the wrong screen, or when a forced position gets stuck — the key
-  re-asserts the window rule either way.
+- **Put it where you want it.** The ✥ key unlocks the keyboard: a bar appears
+  along the top, drag it anywhere, grab either end to resize, then press ✥ again
+  to lock it there. It remembers the spot. Useful when the bottom edge is where
+  the thing you're typing into lives, or when an external monitor has left the
+  keyboard on the wrong screen.
 - **Swipe typing.** Drag across the letters instead of tapping them. Taps are
   unaffected — a drag only counts once it's unmistakably not one.
 - **Optional summon gestures.** Two-finger swipe up from the bottom edge
