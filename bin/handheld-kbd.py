@@ -48,6 +48,13 @@ DEFAULT_CONFIG = {
     # The window position is offset by this output's origin. "" = auto-detect eDP* (the
     # internal panel). Only matters with 2+ displays; single-display is unaffected.
     "internal_output": "",
+    # Where the keyboard sits. A move key (kind "move") steps through the slots: 0 is the
+    # configured geometry above, then one slot per (display, edge) pair with the internal
+    # panel first. Use it when the keyboard shouldn't be pinned to the bottom, when an
+    # external monitor has left it docked to the wrong screen, or when a forced position
+    # gets stuck — the key rewrites the KWin rule even if the rect looks unchanged.
+    "dock": 0,
+    "dock_edges": ["bottom", "top", "middle"],
     # "mirror": true  → the device's keyboard button summons us (via Steam's OSK).
     # "mirror": false → seamless mode: the daemon remaps the hardware keyboard button
     #                   (via InputPlumber) to fire dbus_trigger, which we listen for
@@ -175,8 +182,9 @@ def resolve_rows(layout):
         row = []
         for k in jrow:
             kind = k.get("kind", "")
-            if kind in ("locale", "hide", "size", "opacity"):    # action keys: no keycode
-                dflt = {"locale": "🌐", "hide": "⌵", "size": "⤢", "opacity": "◐"}.get(kind, "")
+            if kind in ("locale", "hide", "size", "opacity", "move"):   # action keys: no keycode
+                dflt = {"locale": "🌐", "hide": "⌵", "size": "⤢",
+                        "opacity": "◐", "move": "✥"}.get(kind, "")
                 row.append((k.get("label", dflt), None, kind, "", ""))
                 continue
             name = k.get("key", "")
@@ -229,7 +237,10 @@ class OSK(Gtk.Window):
         self.locale_btn = None
         self.size_btn = None
         self.opacity_btn = None
+        self.move_btn = None
         self.big = bool(config.get("start_big", False))
+        # Which docking slot we're in; 0 = exactly the configured geometry (see _dock_slots).
+        self.dock = max(0, int(config.get("dock", 0)))
         self.norm_kh = config["key_size"][1]
         self.nrows = max(1, len(rows))
         prov = Gtk.CssProvider(); prov.load_from_data(build_css(config["theme"]))
@@ -267,6 +278,10 @@ class OSK(Gtk.Window):
                     b.connect("clicked", self.on_opacity)
                     self.opacity_btn = b
                     b.set_label(f"{int(round(float(config.get('opacity', 0.72)) * 100))}%")
+                elif kind == 'move':
+                    b.get_style_context().add_class('special')
+                    b.connect("clicked", self.on_move)
+                    self.move_btn = b
                 elif kind == 'hide':
                     b.get_style_context().add_class('hide')
                     b.connect("clicked", lambda *_: self.dismiss())
@@ -778,34 +793,115 @@ class OSK(Gtk.Window):
         # the bottom) — the taller key rows above already grow the strip, no resize/rule.
         if GAMEMODE:
             return
-        ox, oy = self._panel_origin()        # anchor to the internal touchscreen, not an external
-        rect = {"x": g["x"] + ox, "y": g["y"] + oy, "w": g["w"], "h": g["h"]}
+        rect = self._slot_rect(g)            # configured spot, or wherever the move key put us
         self.resize(rect["w"], rect["h"])
         self.move(rect["x"], rect["y"])
         self._apply_kwin_geometry(rect)
+        if self.move_btn:
+            self._set_label(self.move_btn, self._move_label(), "")
+
+    def _outputs(self):
+        """Enabled displays as [{name, x, y, w, h, internal}], the internal panel first.
+
+        Empty list if kscreen-doctor isn't there or says nothing useful, in which case
+        callers fall back to the configured geometry as-is."""
+        want = (self.cfg.get("internal_output", "") or "").lower()
+        outs = []
+        try:
+            data = json.loads(subprocess.check_output(
+                ["kscreen-doctor", "-j"], text=True, timeout=3))
+            for o in data.get("outputs", []):
+                if not o.get("enabled"):
+                    continue
+                pos = o.get("pos") or {}
+                # size comes from the current mode; fall back to the reported size
+                mode = next((m for m in (o.get("modes") or [])
+                             if m.get("id") == o.get("currentModeId")), {})
+                sz = mode.get("size") or o.get("size") or {}
+                name = o.get("name") or ""
+                if not sz.get("width") or not sz.get("height"):
+                    continue
+                outs.append({
+                    "name": name,
+                    "x": int(pos.get("x", 0)), "y": int(pos.get("y", 0)),
+                    "w": int(sz["width"]), "h": int(sz["height"]),
+                    "internal": (name.lower() == want if want
+                                 else name.lower().startswith("edp")),
+                })
+        except Exception:
+            return []
+        outs.sort(key=lambda o: (not o["internal"], o["x"], o["y"]))
+        return outs
 
     def _panel_origin(self):
         """Logical origin (x,y) of the INTERNAL panel (eDP*), so we dock on the built-in
         touchscreen even when an external display shifts the coordinate space (an external
         at 0,0 would otherwise steal position 0,378). Returns (0,0) on a single display or
         any failure — i.e. the original behaviour."""
-        want = (self.cfg.get("internal_output", "") or "").lower()
-        try:
-            data = json.loads(subprocess.check_output(
-                ["kscreen-doctor", "-j"], text=True, timeout=3))
-            outs = [o for o in data.get("outputs", []) if o.get("enabled")]
-            if len(outs) < 2:
-                return (0, 0)                # single display → no offset needed
-            def internal(o):
-                n = (o.get("name") or "").lower()
-                return n == want if want else n.startswith("edp")
-            m = next((o for o in outs if internal(o)), None)
-            if m is None:
-                return (0, 0)
-            pos = m.get("pos") or {}
-            return (int(pos.get("x", 0)), int(pos.get("y", 0)))
-        except Exception:
-            return (0, 0)
+        outs = self._outputs()
+        if len(outs) < 2:
+            return (0, 0)                    # single display → no offset needed
+        m = next((o for o in outs if o["internal"]), None)
+        return (m["x"], m["y"]) if m else (0, 0)
+
+    def _dock_slots(self):
+        """Places the move key can put the keyboard, in cycle order.
+
+        Slot 0 is always the configured geometry anchored to the internal panel — i.e.
+        exactly where the keyboard has always sat, so the default is unchanged. After
+        that comes one slot per (display, edge) pair, internal display first, which is
+        what makes the keyboard reachable when it's docked to the wrong screen or an
+        external monitor has shifted the coordinate space under it.
+
+        Returns [(label, edge, output_or_None)]; resolved live so hotplugging a display
+        changes the cycle without a restart."""
+        slots = [("dock", "configured", None)]
+        for o in self._outputs():
+            for edge in self.cfg.get("dock_edges", DEFAULT_CONFIG["dock_edges"]):
+                slots.append((o["name"] or ("internal" if o["internal"] else "external"),
+                              edge, o))
+        return slots
+
+    def _slot_rect(self, g):
+        """Window rect for the current dock slot, given the configured size `g`."""
+        slots = self._dock_slots()
+        self.dock %= len(slots)              # a display went away → wrap into range
+        label, edge, out = slots[self.dock]
+        if out is None:                      # slot 0: configured position, internal anchor
+            ox, oy = self._panel_origin()
+            return {"x": g["x"] + ox, "y": g["y"] + oy, "w": g["w"], "h": g["h"]}
+        w = min(g["w"], out["w"])
+        h = min(g["h"], out["h"])
+        x = out["x"] + (out["w"] - w) // 2   # centred horizontally on that display
+        y = out["y"] + (out["h"] - h) if edge == "bottom" else out["y"]
+        if edge == "middle":
+            y = out["y"] + (out["h"] - h) // 2
+        return {"x": x, "y": y, "w": w, "h": h}
+
+    # ---- Move key (which screen / which edge the keyboard docks to) ----
+    def on_move(self, btn):
+        """Step to the next docking slot. Also the way out of a wedged position: it
+        forces the KWin rule to be rewritten even when the rect hasn't changed."""
+        if self._stray_tap():
+            return
+        slots = self._dock_slots()
+        self.dock = (self.dock + 1) % len(slots)
+        self._persist("dock", self.dock)
+        self._last_rect = None               # force the rule write even if unchanged
+        self.apply_size()
+
+    def _move_label(self):
+        """Short label for the move key: the edge, plus the display when there's a choice."""
+        slots = self._dock_slots()
+        if not slots:
+            return "✥"
+        name, edge, out = slots[self.dock % len(slots)]
+        if out is None:
+            return "✥"
+        arrow = {"bottom": "✥↓", "top": "✥↑", "middle": "✥•"}.get(edge, "✥")
+        multi = len([s for s in slots if s[2] is not None]) > len(
+            self.cfg.get("dock_edges", DEFAULT_CONFIG["dock_edges"]))
+        return f"{arrow} {name}" if multi else arrow
 
     def _apply_kwin_geometry(self, g):
         """Rewrite our KWin window-rule's forced position/size so it follows the toggle
