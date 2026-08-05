@@ -24,12 +24,7 @@
   },
   "big_key_h": 100,
   "start_big": false,
-  "dock": 0,
-  "dock_edges": [
-    "bottom",
-    "top",
-    "middle"
-  ],
+  "handle_height": 30,
   "key_size": [
     74,
     64

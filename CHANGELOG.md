@@ -9,7 +9,32 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
-## v1.0.3 — A move key
+## v1.0.4 — Unlock, drag, lock
+
+The v1.0.3 move key cycled through preset docking slots. It didn't work well, so this
+replaces it with the obvious thing: unlock the keyboard, put it where you want, lock it.
+
+### Changed
+
+- **The move key (✥) is now a lock toggle.** Press it and the keyboard unlocks: KWin
+  stops forcing its position and size, and a bar appears along the top — drag anywhere on
+  it to move the window, or use either end (⤡ / ⤢) to resize. Press again and it locks
+  exactly where you left it, saving the result as `geometry` so a respawn or relogin comes
+  back to the same place.
+  - Wayland clients can't place their own windows, so both gestures hand off to the
+    compositor (`begin_move_drag` / `begin_resize_drag`) — the same mechanism a titlebar
+    uses — and the position is read back from what KWin remembered.
+  - Unlocking switches the rule to Remember (4) and locking switches it back to Force (2),
+    so nothing nudges the keyboard while it's locked.
+  - It always starts locked; an unlocked keyboard that got respawned would drift.
+  - Desktop Mode only — in Game Mode there's no window to drag, and the key says so.
+- Removed the docking-slot cycle, `dock` and `dock_edges`. `handle_height` (default 30)
+  sets the drag bar's height.
+
+The v1.0.3 resolution clamping stays: the configured geometry is still clamped to the
+panel it lands on, so a saved position can't put the keyboard off-screen.
+
+## v1.0.3 — A move key (superseded by v1.0.4)
 
 ### Added
 
