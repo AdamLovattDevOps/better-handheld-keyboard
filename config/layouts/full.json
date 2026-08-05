@@ -55,6 +55,14 @@
         "key": "KEY_F12"
       },
       {
+        "label": "◐",
+        "kind": "opacity"
+      },
+      {
+        "label": "⤢",
+        "kind": "size"
+      },
+      {
         "label": "⌵",
         "kind": "hide"
       }

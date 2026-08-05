@@ -35,19 +35,92 @@ case "$OP" in ''|*[!0-9.]*) OP=0.72 ;; esac
 hide_steam_wanted() { { [ "$MIRROR" = 1 ] || [ -f "$PROVEN" ]; } && echo 1 || echo 0; }
 
 write_opscript() {          # $1 = 1 to also force Steam's OSK transparent
+    if [ "$1" = 1 ]; then
+        STEAM_RULE="else if (cap.indexOf(\"$NAME\") !== -1) w.opacity = 0.0;"
+    else
+        STEAM_RULE="// Steam's OSK left alone: this keyboard has not proven it can appear yet."
+    fi
     mkdir -p "$(dirname "$OPSCRIPT")"
-    {
-        echo 'function setOp(w){'
-        echo '    try {'
-        echo '        var c = "" + w.resourceClass;'
-        echo '        var cap = "" + w.caption;'
-        echo "        if (c.indexOf(\"handheld-kbd\") !== -1) w.opacity = $OP;"
-        [ "$1" = 1 ] && echo "        else if (cap.indexOf(\"$NAME\") !== -1) w.opacity = 0.0;"
-        echo '    } catch(e){}'
-        echo '}'
-        echo 'workspace.windowList().forEach(setOp);'
-        echo 'workspace.windowAdded.connect(setOp);'
-    } > "$OPSCRIPT"
+    cat > "$OPSCRIPT" <<EOF2
+// Better Handheld Keyboard KWin helper: (1) set our OSK's opacity + hide Steam's OSK,
+// (2) keep the OSK visible above fullscreen windows (e.g. Chrome video fullscreen),
+// (3) keep keyboard focus on the window the user was on when the OSK is summoned.
+var OP = $OP;
+var demoted = {};   // internalId -> true : fullscreen windows WE dropped to keepBelow
+var lastReal = null;   // most recent focusable window the user was on (for focus restore)
+
+function isKbd(w){ return ("" + w.resourceClass).indexOf("handheld-kbd") !== -1; }
+
+function focusable(w){
+    // windows that can hold the user's typing focus: exclude our OSK and
+    // non-activating surfaces (panels/docks, desktop, OSD, notifications).
+    if (!w) return false;
+    if (isKbd(w)) return false;
+    if (w.dock || w.desktopWindow || w.onScreenDisplay || w.notification) return false;
+    return true;
+}
+
+function setOp(w){
+    try {
+        var c = "" + w.resourceClass;
+        var cap = "" + w.caption;
+        if (c.indexOf("handheld-kbd") !== -1) w.opacity = OP;
+        $STEAM_RULE
+    } catch(e){}
+}
+
+// GTK hide() destroys the OSK's Wayland surface, so a present, non-minimized
+// handheld-kbd window means the keyboard is currently shown.
+function kbdShown(){
+    var list = workspace.windowList();
+    for (var i = 0; i < list.length; i++)
+        if (isKbd(list[i]) && !list[i].minimized) return true;
+    return false;
+}
+
+// A fullscreen window sits in KWin's ActiveLayer, above the OSK's keep-above
+// AboveLayer, so it covers the keyboard. keepBelow is evaluated before
+// activeFullScreen, so dropping the fullscreen window to keepBelow (BelowLayer)
+// lets the OSK float on top. Restore it when the OSK hides / leaves fullscreen.
+function applyStack(){
+    try {
+        var shown = kbdShown();
+        var list = workspace.windowList();
+        for (var i = 0; i < list.length; i++){
+            var w = list[i];
+            if (isKbd(w)) continue;
+            var id = "" + w.internalId;
+            if (shown && w.fullScreen){
+                if (!w.keepBelow){ w.keepBelow = true; demoted[id] = true; }
+            } else if (demoted[id]){
+                w.keepBelow = false;
+                delete demoted[id];
+            }
+        }
+    } catch(e){}
+}
+
+function watch(w){
+    try { w.fullScreenChanged.connect(applyStack); w.minimizedChanged.connect(applyStack); } catch(e){}
+}
+function onAdded(w){
+    setOp(w); watch(w); applyStack();
+    // When our OSK maps, the summon (touch gesture / map) may have shifted focus.
+    // Re-assert the window the user was on so typed keys land there. keepBelow keeps
+    // a demoted fullscreen window below the OSK even once it is active again.
+    if (isKbd(w) && lastReal) {
+        // only re-activate if focus actually moved, so we don't needlessly re-raise the
+        // window and disturb the text caret when the summon didn't defocus it.
+        try { if (workspace.activeWindow !== lastReal) workspace.activeWindow = lastReal; } catch(e){}
+    }
+}
+
+workspace.windowActivated.connect(function(w){ if (focusable(w)) lastReal = w; });
+workspace.windowList().forEach(function(w){ setOp(w); watch(w); });
+workspace.windowAdded.connect(onAdded);
+workspace.windowRemoved.connect(applyStack);
+applyStack();
+EOF2
 }
 
 load_opscript() {

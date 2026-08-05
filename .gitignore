@@ -8,3 +8,10 @@ __pycache__/
 .DS_Store
 # runtime scratch (not source)
 *.log
+
+# prediction data — generated locally by handheld-kbd-build-dict, and personal.
+# ~/.local/share/handheld-kbd/{unigrams,bigrams}.txt and learned.json never belong in git.
+unigrams.txt
+bigrams.txt
+learned.json
+raw/

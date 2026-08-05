@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Better Handheld Keyboard — resume re-init
+Comment=Re-initialise the on-screen keyboard after sleep (stale trigger / uinput handle)
+Exec=python3 __BIN__/handheld-kbd-resume-watch.py
+Terminal=false
+OnlyShowIn=KDE;
+X-KDE-autostart-after=panel
+X-GNOME-Autostart-enabled=true

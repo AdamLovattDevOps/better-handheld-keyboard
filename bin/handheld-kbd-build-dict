@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""Build the compact prediction data files for Better Handheld Keyboard.
+
+Reads the raw Google-Web-corpus n-gram lists (Peter Norvig's count_1w.txt /
+count_2w.txt, downloaded to ~/.local/share/handheld-kbd/raw/) and writes two
+small tab-separated files the keyboard loads at startup:
+
+  ~/.local/share/handheld-kbd/unigrams.txt   word <TAB> count
+  ~/.local/share/handheld-kbd/bigrams.txt    prev <TAB> word <TAB> count
+
+The raw lists are web-scraped, so the tail is mostly junk and misspellings —
+we keep the top VOCAB entries and apply a light plausibility filter. Bigrams are
+restricted to that vocabulary and capped per head word, which is what keeps the
+runtime file small enough to load instantly on a handheld.
+
+If the raw files are missing (offline install), falls back to the system aspell
+dictionary with synthetic frequencies: prediction still works, just without the
+"which word is actually common" signal.
+
+Re-runnable at any time; it never touches learned.json (your personal vocabulary).
+"""
+import os, re, sys, subprocess
+
+DATA = os.path.expanduser("~/.local/share/handheld-kbd")
+RAW = os.path.join(DATA, "raw")
+
+VOCAB = 80000          # unigrams retained
+BI_PER_HEAD = 8        # top successors kept per previous-word
+BI_MIN = 5000          # ignore very rare pairs outright
+
+WORD_RE = re.compile(r"^[a-z][a-z']{0,19}$")
+
+
+def plausible(w):
+    """Cheap junk filter for the web-corpus tail."""
+    if not WORD_RE.match(w):
+        return False
+    if len(w) == 1 and w not in ("a", "i"):
+        return False
+    if not re.search(r"[aeiouy]", w) and len(w) > 3:
+        return False          # consonant soup, e.g. scraped markup
+    if re.search(r"(.)\1\1", w):
+        return False          # 3+ repeated letters
+    if w.count("'") > 1:
+        return False
+    return True
+
+
+def build_unigrams():
+    src = os.path.join(RAW, "count_1w.txt")
+    vocab = {}
+    if os.path.exists(src):
+        with open(src, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                w, _, c = line.rstrip("\n").partition("\t")
+                w = w.lower()
+                if not plausible(w):
+                    continue
+                try:
+                    n = int(c)
+                except ValueError:
+                    continue
+                if w in vocab:
+                    vocab[w] += n          # case-folded duplicates merge
+                else:
+                    vocab[w] = n
+                    if len(vocab) >= VOCAB * 2:
+                        break
+        top = sorted(vocab.items(), key=lambda kv: -kv[1])[:VOCAB]
+        print(f"unigrams: {len(top)} from corpus")
+        return dict(top)
+
+    # ---- offline fallback: aspell wordlist, synthetic Zipf-ish frequencies ----
+    print("raw corpus missing -> falling back to aspell dictionary", file=sys.stderr)
+    try:
+        out = subprocess.check_output("aspell -d en dump master | aspell -l en expand",
+                                      shell=True, text=True, timeout=120)
+    except Exception as ex:
+        print(f"aspell fallback failed: {ex}", file=sys.stderr)
+        return {}
+    words = [w.lower() for w in out.split() if plausible(w.lower())]
+    seen = {}
+    for i, w in enumerate(dict.fromkeys(words)):
+        seen[w] = max(1, 1000000 // (i + 1))     # shorter/earlier ~ more common
+    print(f"unigrams: {len(seen)} from aspell (no real frequencies)")
+    return seen
+
+
+def build_bigrams(vocab):
+    src = os.path.join(RAW, "count_2w.txt")
+    if not os.path.exists(src):
+        print("no bigram corpus -> next-word prediction will rely on learning only",
+              file=sys.stderr)
+        return {}
+    heads = {}
+    with open(src, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            pair, _, c = line.rstrip("\n").partition("\t")
+            parts = pair.lower().split()
+            if len(parts) != 2:
+                continue
+            a, b = parts
+            if a not in vocab or b not in vocab:
+                continue
+            try:
+                n = int(c)
+            except ValueError:
+                continue
+            if n < BI_MIN:
+                continue
+            d = heads.setdefault(a, {})
+            d[b] = d.get(b, 0) + n
+    trimmed = {}
+    for a, d in heads.items():
+        top = sorted(d.items(), key=lambda kv: -kv[1])[:BI_PER_HEAD]
+        trimmed[a] = top
+    print(f"bigrams: {len(trimmed)} head words, "
+          f"{sum(len(v) for v in trimmed.values())} pairs")
+    return trimmed
+
+
+def main():
+    os.makedirs(DATA, exist_ok=True)
+    vocab = build_unigrams()
+    if not vocab:
+        print("no vocabulary could be built", file=sys.stderr)
+        return 1
+    bi = build_bigrams(vocab)
+    with open(os.path.join(DATA, "unigrams.txt"), "w") as f:
+        for w, n in sorted(vocab.items(), key=lambda kv: -kv[1]):
+            f.write(f"{w}\t{n}\n")
+    with open(os.path.join(DATA, "bigrams.txt"), "w") as f:
+        for a in sorted(bi):
+            for b, n in bi[a]:
+                f.write(f"{a}\t{b}\t{n}\n")
+    for name in ("unigrams.txt", "bigrams.txt"):
+        p = os.path.join(DATA, name)
+        print(f"wrote {p} ({os.path.getsize(p)/1024:.0f} KiB)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
