@@ -51,6 +51,28 @@ The button is remapped to fire a **DBus event** rather than a keystroke, so
 nothing else reacts to it. Key taps go through **`/dev/uinput`** at the kernel
 level — which is why they reach any app.
 
+## No keyboard at all? Read this
+
+If you installed an earlier version on a **Legion Go 1** — or on a Steam Deck / ROG Ally
+running Bazzite or ChimeraOS — you may have ended up with *no* on-screen keyboard. Sorry.
+The installer picked its "seamless" trigger by looking at InputPlumber's default profile,
+which advertises a keyboard button on every device, and remapped a button your hardware
+never actually sends. Meanwhile it kept Steam's own keyboard transparent. Both keyboards
+gone.
+
+Fix it either way:
+
+```bash
+handheld-kbd-recover          # puts Steam's keyboard back, switches this one to mirror mode
+./install.sh                  # re-running the installer now repairs the same thing
+```
+
+Or double-click **`Recover My Keyboard.desktop`** in this folder — no typing required, which
+rather matters when you have no keyboard.
+
+Want out entirely? `handheld-kbd-recover --stock-only` stands everything down and hands the
+desktop back to Steam's keyboard.
+
 ## Configure
 
 Everything's in `~/.config/handheld-kbd/config.json` — `opacity`, `layout`,

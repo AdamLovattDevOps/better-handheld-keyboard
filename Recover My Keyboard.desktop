@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Recover My Keyboard
+Comment=No on-screen keyboard at all? This puts Steam's back and switches to mirror mode.
+Icon=edit-undo
+Terminal=true
+Exec=bash -c 'f="%k"; f="${f#file://}"; cd "$(dirname "$f")" && chmod +x ./bin/handheld-kbd-recover 2>/dev/null; ./bin/handheld-kbd-recover; echo; read -rp "Press Enter to close."'
+Categories=Utility;System;
