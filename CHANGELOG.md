@@ -9,7 +9,7 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
-## v1.1.0 — Predictive text and a bigger keyboard
+## v1.0.2 — Predictive text and a bigger keyboard
 
 Everything from v1.0.1 stays: the trigger detection fix, the fail-visible KWin rule, the
 recovery script. This adds the features that had been living on my own Legion Go 2.
