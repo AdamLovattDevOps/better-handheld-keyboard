@@ -9,6 +9,28 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.0.3 — A move key
+
+### Added
+
+- **Move key** (`kind: "move"`, ✥). Steps the keyboard through docking slots instead of
+  leaving it pinned wherever the KWin rule put it:
+  - slot 0 is the configured `geometry`, anchored to the internal panel — unchanged
+    default, so nothing moves unless you ask it to
+  - then one slot per (display, edge) pair — `bottom`, `top`, `middle` by default via
+    `dock_edges` — internal panel first, centred horizontally on that display
+  - the slot list is resolved live from `kscreen-doctor`, so plugging in a monitor adds
+    its slots without a restart, and unplugging wraps the selection back into range
+  - it also forces the KWin rule to be rewritten even when the rect looks unchanged,
+    which is the way out of a position that has got stuck
+  - the chosen slot persists to `config.json` as `dock`, and the key's label shows the
+    edge — plus the display name once there's more than one to choose from
+
+### Changed
+
+- Display enumeration moved into one `_outputs()` helper (name, position, current-mode
+  size, internal flag), which `_panel_origin()` now uses too.
+
 ## v1.0.2 — Predictive text and a bigger keyboard
 
 Everything from v1.0.1 stays: the trigger detection fix, the fail-visible KWin rule, the
