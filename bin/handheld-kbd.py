@@ -11,7 +11,7 @@ OS XKB layout. The 🌐 key switches the OS layout via KDE's KeyboardLayouts DBu
 re-skins the on-key labels to match, keeping label and output in sync.
 If any JSON is missing/invalid, built-in defaults are used so it always comes up.
 """
-import gi, sys, time, os, signal, json, subprocess, math
+import gi, sys, time, os, signal, json, subprocess, math, re
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib
 from evdev import UInput, ecodes as e
@@ -739,17 +739,33 @@ class OSK(Gtk.Window):
         keeping it for future shows/respawns."""
         opscript = os.path.expanduser(
             "~/.local/share/kwin/scripts/handheld-kbd-opacity/contents/code/main.js")
-        try:
-            with open(opscript) as f:
-                lines = f.read().splitlines()
-            for i, l in enumerate(lines):
-                if l.strip().startswith("var OP ="):
-                    lines[i] = f"var OP = {val};"
-                    break
-            with open(opscript, "w") as f:
-                f.write("\n".join(lines) + "\n")
-        except Exception as ex:
-            print(f"handheld-kbd: could not patch opacity script ({ex})", file=sys.stderr)
+        # Regenerate with the shared writer where it exists. Patching the file in place used
+        # to be the only route, and it failed silently against a script that had no `var OP`
+        # line — every reload then snapped the keyboard back to the value baked into that
+        # file. Generating leaves nothing to go stale.
+        writer = os.path.expanduser("~/.local/bin/handheld-kbd-kwin-script")
+        written = False
+        if os.access(writer, os.X_OK):
+            try:
+                subprocess.run([writer, "--opacity", str(val), "--out", opscript],
+                               check=True, timeout=5)
+                written = True
+            except Exception as ex:
+                print(f"handheld-kbd: kwin-script writer failed ({ex})", file=sys.stderr)
+        if not written:
+            try:
+                with open(opscript) as f:
+                    text = f.read()
+                if "var OP =" in text:
+                    text = re.sub(r"var OP = [^;]+;", f"var OP = {val};", text, count=1)
+                else:
+                    # very old script: the value is inlined in the handheld-kbd branch
+                    text = re.sub(r'(indexOf\("handheld-kbd"\) !== -1\) w\.opacity = )[0-9.]+',
+                                  rf"\g<1>{val}", text, count=1)
+                with open(opscript, "w") as f:
+                    f.write(text)
+            except Exception as ex:
+                print(f"handheld-kbd: could not patch opacity script ({ex})", file=sys.stderr)
         S = "org.kde.kwin.Scripting."
         for args in (["unloadScript", "handheld-kbd-opacity"],
                      ["loadScript", opscript, "handheld-kbd-opacity"],
