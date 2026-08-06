@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Restore the Steam Deck's trackpad and stick pointer.
+#
+# The cause: while Steam believes its own on-screen keyboard is open, it forces the
+# controller into its "KB ActionSet", where the sticks and trackpads navigate that
+# keyboard instead of moving the desktop pointer. Steam's own log says so plainly:
+#
+#   Set OSK active 1 and appid 413080
+#   OnFocusWindowChanged On Screen Keyboard Forcing to window type: KB ActionSet
+#
+# Versions before 1.0.10 hid Steam's keyboard by setting its opacity to zero. The window
+# stayed mapped, so Steam went on believing its keyboard was open, and the Deck had no
+# pointer for as long as ours was up. Current versions close it instead.
+#
+# This is the cleanup for a session that is already stuck. It closes the leftover window,
+# which is all Steam needs to switch back to the desktop controller config — no restart,
+# and nothing else on the machine is disturbed.
+set -u
+NAME="Steam Input On-screen Keyboard"
+
+if ! command -v qdbus6 >/dev/null 2>&1; then
+    echo "!! qdbus6 not found — this needs KDE Plasma 6" >&2
+    exit 1
+fi
+
+JS=/tmp/handheld-kbd-close-steam-osk.js
+cat > "$JS" <<EOF
+var n = 0;
+workspace.windowList().forEach(function(w){
+    if (("" + w.caption).indexOf("$NAME") !== -1) { try { w.closeWindow(); n++; } catch(e){} }
+});
+print("HHKBD fix-pointer closed " + n + " Steam OSK window(s)");
+EOF
+
+echo ":: closing Steam's on-screen keyboard…"
+qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript hhkbd-close-osk >/dev/null 2>&1
+qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.loadScript "$JS" hhkbd-close-osk >/dev/null 2>&1
+qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.start >/dev/null 2>&1
+sleep 1
+qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript hhkbd-close-osk >/dev/null 2>&1
+
+echo ":: done — the trackpad and stick pointer should work again."
+echo
+echo "   Still dead? Steam itself may have stopped: check with 'pgrep -c steamwebhelper'."
+echo "   Deliberately not restarting Steam here — a half-started Steam client leaves you"
+echo "   with no pointer at all, which is worse than the problem being fixed. Start it"
+echo "   from the launcher, or reboot."

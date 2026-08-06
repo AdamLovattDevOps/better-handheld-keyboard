@@ -42,6 +42,8 @@ install -m755 "$HERE/bin/handheld-kbd-recover"   "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-dock-rect" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-install-filter" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-toggle" "$BIN/"
+install -m755 "$HERE/bin/handheld-kbd-ctl" "$BIN/"
+install -m755 "$HERE/bin/handheld-kbd-fix-pointer" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-build-dict" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-focus-probe" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-resume.sh"  "$BIN/"
@@ -202,6 +204,18 @@ sed "s#__BIN__#$BIN#g" "$HERE/autostart/handheld-kbd.desktop"      > "$AUTO/hand
 sed "s#__BIN__#$BIN#g" "$HERE/autostart/handheld-kbd-swap.desktop" > "$AUTO/handheld-kbd-swap.desktop"
 sed "s#__BIN__#$BIN#g" "$HERE/autostart/handheld-kbd-resume.desktop"   > "$AUTO/handheld-kbd-resume.desktop"
 chmod 644 "$AUTO/handheld-kbd.desktop" "$AUTO/handheld-kbd-swap.desktop" "$AUTO/handheld-kbd-resume.desktop"
+
+# --- application-menu shortcuts (show/hide, restart, stop, reset position) ---
+# Typing a command is the one thing you can't do when the keyboard is the problem,
+# so every recovery action is also a thing you can click.
+APPS="$HOME/.local/share/applications"
+mkdir -p "$APPS"
+for s in "$HERE"/shortcuts/*.desktop; do
+  [ -f "$s" ] || continue
+  sed "s#__BIN__#$BIN#g" "$s" > "$APPS/$(basename "$s")"
+  chmod 644 "$APPS/$(basename "$s")"
+done
+command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$APPS" 2>/dev/null
 
 # --- KWin window rule (pins the keyboard: on top, no focus-steal, bottom-docked) ---
 if command -v kwriteconfig6 >/dev/null 2>&1; then

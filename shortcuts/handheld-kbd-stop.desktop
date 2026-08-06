@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Stop Handheld Keyboard
+Comment=Shut the keyboard down until you start it again or log back in
+Icon=process-stop
+Terminal=false
+Exec=__BIN__/handheld-kbd-ctl stop
+Categories=Utility;Accessibility;
+Keywords=keyboard;stop;kill;quit;

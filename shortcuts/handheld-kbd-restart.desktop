@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Restart Handheld Keyboard
+Comment=Stop and start the keyboard — the usual fix when it stops responding
+Icon=view-refresh
+Terminal=false
+Exec=__BIN__/handheld-kbd-ctl restart
+Categories=Utility;Accessibility;
+Keywords=keyboard;restart;reload;

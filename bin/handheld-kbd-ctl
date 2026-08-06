@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# Start, stop and restart the keyboard without logging out.
+#
+# The keyboard normally looks after itself: the supervisor starts it at login and
+# respawns it if it dies. This is for the times it doesn't — a bad config edit, a
+# wedged Wayland connection, or a position you want to put back.
+#
+#   handheld-kbd-ctl status      what is running, and where the keyboard is
+#   handheld-kbd-ctl start       start the supervisor (and so the keyboard)
+#   handheld-kbd-ctl stop        stop both; nothing respawns until you start it again
+#   handheld-kbd-ctl restart     stop, then start — the usual fix
+#   handheld-kbd-ctl reset       put the keyboard back on the bottom dock
+#
+# Every action is safe to repeat: stopping something already stopped is a no-op,
+# and starting something already running restarts it rather than running two.
+set -u
+
+BIN="$HOME/.local/bin"
+KBD_PAT='python3 .*handheld-kbd\.py'
+SUP_PAT='handheld-kbd-swap\.sh'
+
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+
+# Match by pattern but never kill ourselves or our own parents: `handheld-kbd-ctl`
+# run from a shell whose argv mentions the pattern would otherwise take the shell
+# with it, which is a memorable way to lose an SSH session.
+kill_pattern() {
+    local pat="$1" sig="${2:-TERM}" p
+    for p in $(pgrep -f "$pat" 2>/dev/null); do
+        [ "$p" = "$$" ] && continue
+        [ "$p" = "$PPID" ] && continue
+        kill "-$sig" "$p" 2>/dev/null
+    done
+}
+
+running() { pgrep -f "$1" >/dev/null 2>&1; }
+
+stop_all() {
+    systemctl --user stop handheld-kbd >/dev/null 2>&1
+    kill_pattern "$SUP_PAT"           # supervisor first, or it respawns the keyboard
+    sleep 0.5
+    kill_pattern "$KBD_PAT"
+    for _ in $(seq 12); do
+        running "$KBD_PAT" || break
+        sleep 0.25
+    done
+    kill_pattern "$KBD_PAT" KILL
+    rm -f /tmp/handheld-kbd-swap.lock
+}
+
+start_all() {
+    # Start under the user service manager rather than from this shell. Run over SSH —
+    # which is exactly where you end up when the keyboard is the problem — this shell has
+    # no display and no session bus, and a keyboard inheriting that comes up unable to
+    # open a display or to answer on DBus. The service manager has the real session
+    # environment, imported at login.
+    if command -v systemd-run >/dev/null 2>&1; then
+        systemctl --user reset-failed handheld-kbd >/dev/null 2>&1
+        systemd-run --user --collect --unit=handheld-kbd \
+            "$BIN/handheld-kbd-swap.sh" >/dev/null 2>&1 \
+            || setsid "$BIN/handheld-kbd-swap.sh" >>/tmp/handheld-kbd-out.log 2>&1 &
+    else
+        setsid "$BIN/handheld-kbd-swap.sh" >>/tmp/handheld-kbd-out.log 2>&1 &
+    fi
+    for _ in $(seq 40); do            # the supervisor spawns the keyboard itself
+        running "$KBD_PAT" && break
+        sleep 0.25
+    done
+}
+
+case "${1:-restart}" in
+    status)
+        running "$SUP_PAT" && echo "supervisor: running" || echo "supervisor: stopped"
+        running "$KBD_PAT" && echo "keyboard:   running" || echo "keyboard:   stopped"
+        echo "visible:    $([ "$(cat /tmp/handheld-kbd.vis 2>/dev/null)" = 1 ] && echo yes || echo no)"
+        python3 - <<'PY' 2>/dev/null
+import json, os
+p = os.path.expanduser("~/.config/handheld-kbd/config.json")
+try:
+    c = json.load(open(p))
+except Exception:
+    raise SystemExit
+print("position:   %s %s" % (c.get("position_mode", "bottom"), c.get("geometry", "")))
+PY
+        ;;
+    stop)
+        stop_all
+        echo "keyboard stopped. 'handheld-kbd-ctl start' brings it back."
+        ;;
+    start)
+        stop_all                      # idempotent: never end up with two supervisors
+        start_all
+        running "$KBD_PAT" && echo "keyboard started." || { echo "keyboard did not start — see /tmp/handheld-kbd-out.log" >&2; exit 1; }
+        ;;
+    restart)
+        stop_all
+        start_all
+        running "$KBD_PAT" && echo "keyboard restarted." || { echo "keyboard did not come back — see /tmp/handheld-kbd-out.log" >&2; exit 1; }
+        ;;
+    reset)
+        # Ask the running keyboard first so the change is visible immediately; fall
+        # back to editing the config for a keyboard that isn't up to answer.
+        if busctl --user call org.handheld.Keyboard /org/handheld/Keyboard \
+                 org.handheld.Keyboard Reset >/dev/null 2>&1; then
+            echo "keyboard reset to the bottom dock."
+        else
+            python3 - <<'PY'
+import json, os
+p = os.path.expanduser("~/.config/handheld-kbd/config.json")
+try:
+    c = json.load(open(p))
+except Exception:
+    c = {}
+c["position_mode"] = "bottom"
+c.pop("geometry", None)
+os.makedirs(os.path.dirname(p), exist_ok=True)
+json.dump(c, open(p, "w"), indent=2)
+PY
+            echo "position reset; it applies next time the keyboard starts."
+        fi
+        ;;
+    *)
+        echo "usage: handheld-kbd-ctl [status|start|stop|restart|reset]" >&2
+        exit 2
+        ;;
+esac

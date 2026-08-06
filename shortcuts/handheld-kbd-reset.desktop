@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Reset Keyboard Position
+Comment=Put the keyboard back on the bottom dock at its default size
+Icon=go-bottom
+Terminal=false
+Exec=__BIN__/handheld-kbd-ctl reset
+Categories=Utility;Accessibility;
+Keywords=keyboard;reset;position;dock;

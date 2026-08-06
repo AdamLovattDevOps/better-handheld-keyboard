@@ -47,6 +47,13 @@ So I built the keyboard I wanted instead. Here's what it does differently:
   bottom dock.
 - **It doesn't need Steam.** `handheld-kbd-toggle` shows and hides it directly, so
   a dead Steam client can't leave you without a keyboard. Bind it to a shortcut.
+- **Your trackpads still work.** On a Deck, Steam's own keyboard is what summons this
+  one — and while Steam thinks its keyboard is open, the sticks and trackpads navigate
+  *that* instead of moving the pointer. Steam's keyboard is closed rather than hidden, so
+  the pointer stays yours.
+- **Shortcuts for when it goes wrong.** Show/hide, restart, stop, reset position and fix
+  the trackpad pointer all appear in the application menu — clickable, because typing is
+  the one thing you can't do when the keyboard is the problem.
 - **Swipe typing.** Drag across the letters instead of tapping them. Taps are
   unaffected — a drag only counts once it's unmistakably not one.
 - **Optional summon gestures.** Two-finger swipe up from the bottom edge
@@ -97,6 +104,31 @@ rather matters when you have no keyboard.
 
 Want out entirely? `handheld-kbd-recover --stock-only` stands everything down and hands the
 desktop back to Steam's keyboard.
+
+## Trackpads or stick pointer stopped working?
+
+Versions before 1.0.10 hid Steam's on-screen keyboard instead of closing it. Steam kept
+believing its keyboard was open, and while it believes that it puts the controller in its
+"KB ActionSet" — sticks and trackpads navigate Steam's keyboard rather than moving the
+pointer. Update, and if a session is still stuck:
+
+```bash
+handheld-kbd-fix-pointer
+```
+
+Or click **Fix Trackpad and Stick Pointer** in the application menu. It closes the leftover
+window; no Steam restart, no relogin.
+
+## Controlling it
+
+```bash
+handheld-kbd-ctl status      # what's running, and where the keyboard is
+handheld-kbd-ctl restart     # the usual fix
+handheld-kbd-ctl stop        # until you start it again or log back in
+handheld-kbd-ctl reset       # back to the bottom dock
+```
+
+All of these are in the application menu too.
 
 ## Predictive text
 
