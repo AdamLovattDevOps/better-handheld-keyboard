@@ -58,9 +58,26 @@ write_opscript "$HIDE_STEAM"
 # Seamless mode: remap the hardware keyboard button (via InputPlumber) so it fires our
 # DBus event instead of triggering Steam's OSK. If that remap can't be applied, fall back
 # to mirror mode for this session — better a keyboard on Steam's trigger than no keyboard.
-if [ "$MIRROR" = 0 ] && [ -x "$HOME/.local/bin/handheld-kbd-ip-remap" ]; then
-    if ! "$HOME/.local/bin/handheld-kbd-ip-remap" >>/tmp/swap-startup.log 2>&1; then
-        echo "REMAP FAILED $(date) — falling back to mirror mode" >>/tmp/swap-startup.log
+# The fallback is recorded in a file, not just a variable: the keyboard regenerates the
+# KWin script too (opacity key, placement changes) and would otherwise write MIRROR=0 back,
+# silently undoing the fallback while the trigger is still dead.
+FALLBACK=/tmp/handheld-kbd.mirror-fallback
+rm -f "$FALLBACK"
+SEAMLESS_WANTED=0
+[ "$MIRROR" = 0 ] && SEAMLESS_WANTED=1
+
+apply_remap() {          # 0 = the hardware button now drives us
+    [ -x "$HOME/.local/bin/handheld-kbd-ip-remap" ] || return 1
+    "$HOME/.local/bin/handheld-kbd-ip-remap" >>/tmp/swap-startup.log 2>&1
+}
+
+REMAPPED=0
+if [ "$SEAMLESS_WANTED" = 1 ]; then
+    if apply_remap; then
+        REMAPPED=1
+    else
+        echo "REMAP FAILED $(date) — mirroring Steam's OSK until it can be applied" >>/tmp/swap-startup.log
+        : > "$FALLBACK"
         MIRROR=1
         HIDE_STEAM=$(hide_steam_wanted)
         write_opscript "$HIDE_STEAM"
@@ -87,6 +104,36 @@ while true; do
             HIDE_STEAM=$want
             write_opscript "$HIDE_STEAM"
             load_opscript
+        fi
+    fi
+
+    # InputPlumber drops its composite device whenever the controller re-enumerates — on a
+    # Legion Go that happens when the pads are detached, or the service restarts. The remap
+    # goes with it and the hardware button quietly stops working. Keep trying until it
+    # sticks, then drop the mirror fallback.
+    if [ "$SEAMLESS_WANTED" = 1 ] && [ "$REMAPPED" = 0 ]; then
+        retry=$((${retry:-0} + 1))
+        if [ "$retry" -ge 5 ]; then          # every ~10s
+            retry=0
+            if apply_remap; then
+                REMAPPED=1
+                rm -f "$FALLBACK"
+                MIRROR=0
+                echo "REMAP RECOVERED $(date) — hardware button live again" >>/tmp/swap-startup.log
+                HIDE_STEAM=$(hide_steam_wanted)
+                write_opscript "$HIDE_STEAM"
+                load_opscript
+            fi
+        fi
+    elif [ "$SEAMLESS_WANTED" = 1 ] && [ "$REMAPPED" = 1 ]; then
+        # ...and notice if it goes away again.
+        check=$((${check:-0} + 1))
+        if [ "$check" -ge 15 ]; then         # every ~30s
+            check=0
+            if ! busctl --system tree org.shadowblip.InputPlumber 2>/dev/null | grep -q CompositeDevice; then
+                REMAPPED=0
+                echo "REMAP LOST $(date) — InputPlumber has no composite device" >>/tmp/swap-startup.log
+            fi
         fi
     fi
 
