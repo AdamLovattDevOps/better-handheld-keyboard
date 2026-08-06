@@ -9,6 +9,30 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.0.9-rc1 — The tick actually holds the position
+
+### Fixed
+
+- **✓ no longer resets the keyboard.** Finishing a move asked KWin where the window was and
+  then waited a fixed 250 ms for the answer. When the reply came back later than that — which
+  it does after a real drag, as opposed to a scripted one — we had already given up, and
+  giving up hands placement back to the script, which re-docks. It now waits for the answer
+  (up to ~1.5s, re-asking half way through) and only then saves and holds the position.
+- **Geometry reporting no longer depends on one signal name.** KWin has moved these around
+  between versions, so the script connects to whichever of `frameGeometryChanged`,
+  `geometryChanged`, `moveResizedChanged`, `interactiveMoveResizeFinished` and
+  `interactiveMoveResizeStepped` exist, and logs how many it found.
+
+### Changed
+
+- **The free-move indicator is much quieter.** The bar appearing is signal enough; the blue
+  fill on the key and the accent stripe on the bar were shouting about it. Muted bar, muted
+  grips, and the key takes a thin outline instead of a solid block.
+
+Verified on a Legion Go 2: moved to an arbitrary 220,140 (not snapped to an edge), held
+through the tick, still there three seconds later and after a hide/show cycle, saved as
+`custom {x: 220, y: 140}`.
+
 ## v1.0.8 — Event-driven, free movement, and prediction that works out of the box
 
 ### Changed

@@ -246,8 +246,20 @@ function reportGeometry(w){
 }
 
 function watchGeometry(w){
-    try { w.frameGeometryChanged.connect(function(){ reportGeometry(w); }); } catch(e){}
-    try { w.interactiveMoveResizeFinished.connect(function(){ reportGeometry(w); }); } catch(e){}
+    // Signal names have moved around between KWin versions, so connect to whichever exist
+    // rather than assuming. Each is wrapped: one missing signal must not stop the others.
+    var signals = ["frameGeometryChanged", "geometryChanged", "moveResizedChanged",
+                   "interactiveMoveResizeFinished", "interactiveMoveResizeStepped"];
+    var connected = 0;
+    for (var i = 0; i < signals.length; i++) {
+        try {
+            if (w[signals[i]] && w[signals[i]].connect) {
+                w[signals[i]].connect(function(){ reportGeometry(w); });
+                connected++;
+            }
+        } catch(e){}
+    }
+    print("HHKBD watching geometry via " + connected + " signal(s)");
     reportGeometry(w);
 }
 function onAdded(w){
