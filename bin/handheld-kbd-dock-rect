@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""Print the default bottom-dock rect for the internal panel, as `X,Y W,H`.
+
+The keyboard works this out for itself at runtime; the installer uses this so the forced
+KWin rule starts out matching, instead of flashing the window at the wrong size on the
+first show. Prints nothing if the display can't be inspected — callers fall back.
+"""
+import json
+import os
+import subprocess
+import sys
+
+CFG = os.path.expanduser("~/.config/handheld-kbd/config.json")
+
+
+def frac():
+    try:
+        with open(CFG) as f:
+            return float(json.load(f).get("dock_height_frac", 0.42))
+    except Exception:
+        return 0.42
+
+
+def internal_panel():
+    try:
+        data = json.loads(subprocess.check_output(
+            ["kscreen-doctor", "-j"], text=True, timeout=5))
+    except Exception:
+        return None
+    outs = [o for o in data.get("outputs", []) if o.get("enabled")]
+    if not outs:
+        return None
+    chosen = next((o for o in outs if (o.get("name") or "").lower().startswith("edp")), outs[0])
+    mode = next((m for m in (chosen.get("modes") or [])
+                 if m.get("id") == chosen.get("currentModeId")), {})
+    size = mode.get("size") or chosen.get("size") or {}
+    if not size.get("width") or not size.get("height"):
+        return None
+    return int(size["width"]), int(size["height"])
+
+
+def main():
+    panel = internal_panel()
+    if not panel:
+        return 1
+    w, h = panel
+    kh = max(120, min(int(round(h * frac())), h))
+    print(f"0,{h - kh} {w},{kh}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

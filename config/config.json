@@ -10,18 +10,9 @@
     0.4,
     0.25
   ],
-  "geometry": {
-    "x": 0,
-    "y": 378,
-    "w": 1280,
-    "h": 422
-  },
-  "big_geometry": {
-    "x": 0,
-    "y": 256,
-    "w": 1280,
-    "h": 488
-  },
+  "position_mode": "bottom",
+  "dock_height_frac": 0.42,
+  "big_height_frac": 0.55,
   "big_key_h": 100,
   "start_big": false,
   "handle_height": 30,
@@ -56,7 +47,9 @@
     "mod_on_border": "#ffe000",
     "special_bg": "#2a2a2a",
     "special_fg": "#bbccdd",
-    "shifted_fg": "#7fb0ff"
+    "shifted_fg": "#7fb0ff",
+    "handle_bg": "#1e2733",
+    "handle_fg": "#9fb4c7"
   },
   "hotkey": [],
   "mirror": true,

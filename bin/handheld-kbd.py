@@ -48,9 +48,17 @@ DEFAULT_CONFIG = {
     # The window position is offset by this output's origin. "" = auto-detect eDP* (the
     # internal panel). Only matters with 2+ displays; single-display is unaffected.
     "internal_output": "",
+    # Where the keyboard sits. "bottom" (the default) ignores `geometry` and docks flush
+    # with the bottom of the internal panel, full width, at a FRACTION of the panel height
+    # — so every device and resolution gets the same keyboard in the same place, like
+    # Steam's own OSK. "custom" uses `geometry`, which is what the lock key writes after
+    # you drag the keyboard somewhere. The reset key (kind "reset") goes back to "bottom".
+    "position_mode": "bottom",
+    "dock_height_frac": 0.42,
+    "big_height_frac": 0.55,
     # The move key (kind "move") unlocks the keyboard: KWin stops forcing its position and
-    # size, a drag bar appears, and you put it where you want — any edge, any display, any
-    # size. Pressing it again locks it there and saves the result back to `geometry`.
+    # size, a drag bar appears, and you put it where you want. Pressing it again locks it
+    # exactly there — it does not move the window — and saves the spot as `geometry`.
     "handle_height": 30,
     # "mirror": true  → the device's keyboard button summons us (via Steam's OSK).
     # "mirror": false → seamless mode: the daemon remaps the hardware keyboard button
@@ -179,9 +187,9 @@ def resolve_rows(layout):
         row = []
         for k in jrow:
             kind = k.get("kind", "")
-            if kind in ("locale", "hide", "size", "opacity", "move"):   # action keys: no keycode
+            if kind in ("locale", "hide", "size", "opacity", "move", "reset"):
                 dflt = {"locale": "🌐", "hide": "⌵", "size": "⤢",
-                        "opacity": "◐", "move": "✥"}.get(kind, "")
+                        "opacity": "◐", "move": "✥", "reset": "⤓"}.get(kind, "")
                 row.append((k.get("label", dflt), None, kind, "", ""))
                 continue
             name = k.get("key", "")
@@ -213,10 +221,14 @@ button.suggest:active {{ background: {t['key_active']}; }}
 button.suggest-empty {{ background: transparent; border-color: transparent; }}
 window.gm {{ background-color: rgba(0,0,0,0); }}
 .gm-keys {{ background-color: rgba(12,12,12,0.82); }}
-.handle-drag {{ background: {t['mod_on_bg']}; }}
-.handle-drag label {{ color: {t['mod_on_fg']}; font-weight: bold; }}
-.handle-grip {{ background: {t['key_active']}; padding: 0 14px; }}
-.handle-grip label {{ color: #ffffff; font-weight: bold; font-size: 18px; }}
+.handle-drag {{ background: {t.get('handle_bg', '#1e2733')};
+               border-top: 2px solid {t['key_active']}; }}
+.handle-drag label {{ color: {t.get('handle_fg', '#9fb4c7')}; font-size: 13px;
+                     letter-spacing: 1px; }}
+.handle-grip {{ background: {t.get('handle_bg', '#1e2733')};
+               border-top: 2px solid {t['key_active']}; padding: 0 16px; }}
+.handle-grip label {{ color: {t['key_active']}; font-size: 17px; }}
+button.unlocked {{ background: {t['key_active']}; color: #06121c; font-weight: bold; }}
 """.encode()
 
 
@@ -252,7 +264,7 @@ class OSK(Gtk.Window):
         # Uniform aligned grid: every key snaps to a column grid (column_homogeneous),
         # widths come from per-kind unit spans, rows centred → tidy, even alignment.
         kh = config["key_size"][1]
-        SPAN = {'': 2, 'wide': 3, 'mod': 3, 'space': 8, 'locale': 2, 'hide': 2, 'size': 2, 'opacity': 2}
+        SPAN = {'': 2, 'wide': 3, 'mod': 3, 'space': 8, 'locale': 2, 'hide': 2, 'reset': 2, 'size': 2, 'opacity': 2}
         row_units = [sum(SPAN.get(k[2], 2) for k in row) for row in rows]
         maxu = max(row_units) if row_units else 1
         grid = Gtk.Grid()
@@ -285,6 +297,9 @@ class OSK(Gtk.Window):
                     b.get_style_context().add_class('special')
                     b.connect("clicked", self.on_move)
                     self.move_btn = b
+                elif kind == 'reset':
+                    b.get_style_context().add_class('special')
+                    b.connect("clicked", self.on_reset)
                 elif kind == 'hide':
                     b.get_style_context().add_class('hide')
                     b.connect("clicked", lambda *_: self.dismiss())
@@ -790,7 +805,7 @@ class OSK(Gtk.Window):
         # so there big_key_h is what actually grows the docked strip.
         kh = self.cfg.get("big_key_h", 100) if (big and GAMEMODE) else self.norm_kh
         g = (self.cfg.get("big_geometry", DEFAULT_CONFIG["big_geometry"])
-             if big else self.cfg["geometry"])
+             if big else self.cfg.get("geometry", DEFAULT_CONFIG["geometry"]))
         if not GAMEMODE:
             # The suggestion row eats into a window whose size is FORCED by the KWin
             # rule. Left alone, full-height keys push the window's minimum past that
@@ -816,7 +831,7 @@ class OSK(Gtk.Window):
         # the bottom) — the taller key rows above already grow the strip, no resize/rule.
         if GAMEMODE:
             return
-        rect = self._slot_rect(g)
+        rect = self._slot_rect(g, big)
         self.resize(rect["w"], rect["h"])
         self.move(rect["x"], rect["y"])
         if not self.unlocked:                # unlocked: the user is placing it by hand
@@ -918,7 +933,9 @@ class OSK(Gtk.Window):
         if self.unlocked:
             self._set_rule_mode(4)              # Remember: KWin lets it be moved/resized
         else:
-            g = self._read_rule_geometry()      # whatever the user dragged it to
+            # Lock means "pin it exactly here" — never move the window. Read back where
+            # the user left it, force that rect, and remember it as the custom position.
+            g = self._read_rule_geometry()
             if g:
                 outs = self._outputs()
                 anchor = next((o for o in outs if o["internal"]), outs[0] if outs else None)
@@ -926,10 +943,30 @@ class OSK(Gtk.Window):
                 ox, oy = self._panel_origin()   # geometry is stored panel-relative
                 self.cfg["geometry"] = {"x": g["x"] - ox, "y": g["y"] - oy,
                                         "w": g["w"], "h": g["h"]}
+                self.cfg["position_mode"] = "custom"
                 self._persist("geometry", self.cfg["geometry"])
+                self._persist("position_mode", "custom")
                 self._last_rect = None          # so the re-force definitely writes
-            self._set_rule_mode(2)              # Force it to stay where they put it
-            self.apply_size()
+                self._set_rule_mode(2)          # Force — pins it where it already is
+                self._apply_kwin_geometry(g)
+            else:
+                # Couldn't read it back: still lock, but leave the window alone rather
+                # than yanking it somewhere the user didn't choose.
+                print("handheld-kbd: could not read back the dragged position; "
+                      "locking in place", file=sys.stderr)
+                self._set_rule_mode(2)
+        self._apply_handle()
+
+    def on_reset(self, btn):
+        """Put the keyboard back to the default bottom dock, forgetting a custom spot."""
+        if self._stray_tap():
+            return
+        self.unlocked = False
+        self.cfg["position_mode"] = "bottom"
+        self._persist("position_mode", "bottom")
+        self._last_rect = None
+        self._set_rule_mode(2)
+        self.apply_size()
         self._apply_handle()
 
     def _apply_handle(self):
@@ -942,9 +979,9 @@ class OSK(Gtk.Window):
                 self.handle.hide()
                 self.handle.set_no_show_all(True)
         if self.move_btn:
-            self._set_label(self.move_btn, "🔒" if self.unlocked else "✥", "")
+            self._set_label(self.move_btn, "🔓" if self.unlocked else "✥", "")
             ctx = self.move_btn.get_style_context()
-            (ctx.add_class if self.unlocked else ctx.remove_class)("mod-on")
+            (ctx.add_class if self.unlocked else ctx.remove_class)("unlocked")
 
     def _build_handle(self):
         """A thin bar: drag anywhere along it to move, use either end to resize.
@@ -1002,11 +1039,26 @@ class OSK(Gtk.Window):
         y = min(max(rect["y"], out["y"]), out["y"] + out["h"] - h)
         return {"x": x, "y": y, "w": w, "h": h}
 
-    def _slot_rect(self, g):
-        """Window rect for the configured geometry, anchored to the internal panel and
-        clamped to it, so it lands on-screen whatever the resolution."""
+    def _dock_rect(self, out, big):
+        """The default spot: full width, flush with the bottom edge, height a fixed
+        fraction of the panel. Steam's own on-screen keyboard sits like this, and because
+        it's a fraction rather than a pixel count it lands identically on a 1280x800 Deck,
+        an 800p OLED and a 1920x1200 Legion Go."""
+        frac = float(self.cfg.get("big_height_frac" if big else "dock_height_frac",
+                                  DEFAULT_CONFIG["big_height_frac" if big else "dock_height_frac"]))
+        h = max(120, min(int(round(out["h"] * frac)), out["h"]))
+        return {"x": out["x"], "y": out["y"] + out["h"] - h, "w": out["w"], "h": h}
+
+    def _slot_rect(self, g, big=False):
+        """Where the window goes: the bottom dock by default, or the position the user
+        dragged it to and locked (`position_mode: custom`). Always clamped to the panel."""
         outs = self._outputs()
         anchor = next((o for o in outs if o["internal"]), outs[0] if outs else None)
+        if self.cfg.get("position_mode", "bottom") != "custom" or not g:
+            if anchor:
+                return self._dock_rect(anchor, big)
+            # no display info: fall back to the configured rect as-is
+            g = g or dict(DEFAULT_CONFIG["geometry"])
         ox, oy = self._panel_origin()
         return self._clamp_rect(
             {"x": g["x"] + ox, "y": g["y"] + oy, "w": g["w"], "h": g["h"]}, anchor)
@@ -1472,6 +1524,8 @@ if __name__ == "__main__":
         pass
     try:
         main()
+    except SystemExit:
+        raise                       # e.g. the single-instance lock bowing out; not a crash
     except BaseException:
         try:
             with open("/tmp/handheld-kbd-crash.log", "w") as _f:

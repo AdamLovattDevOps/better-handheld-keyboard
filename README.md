@@ -38,11 +38,12 @@ So I built the keyboard I wanted instead. Here's what it does differently:
   Toggles live, no relogin.
 - **Cycle transparency from the keyboard.** The ◐ key steps through
   `opacity_steps` instead of making you edit JSON to see what's underneath.
-- **Put it where you want it.** The ✥ key unlocks the keyboard: a bar appears
-  along the top, drag it anywhere, grab either end to resize, then press ✥ again
-  to lock it there. It remembers the spot. Useful when the bottom edge is where
-  the thing you're typing into lives, or when an external monitor has left the
-  keyboard on the wrong screen.
+- **Same place on every device.** It docks flush with the bottom edge, full
+  width, at a fixed fraction of the panel height — a Deck LCD, a Deck OLED and a
+  Legion Go 2 all get the same keyboard in the same spot.
+- **Or put it where you want it.** The ✥ key unlocks it: a bar appears along the
+  top, drag it anywhere, grab either end to resize, then press ✥ again to lock it
+  exactly there. ⤓ puts it back to the bottom dock.
 - **Swipe typing.** Drag across the letters instead of tapping them. Taps are
   unaffected — a drag only counts once it's unmistakably not one.
 - **Optional summon gestures.** Two-finger swipe up from the bottom edge

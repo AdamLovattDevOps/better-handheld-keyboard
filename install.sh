@@ -39,6 +39,7 @@ install -m755 "$HERE/bin/handheld-kbd-swap.sh"   "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-relogin"   "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-ip-remap"  "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-recover"   "$BIN/"
+install -m755 "$HERE/bin/handheld-kbd-dock-rect" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-build-dict" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-focus-probe" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-resume.sh"  "$BIN/"
@@ -180,46 +181,10 @@ PY
   fi
 fi
 
-# --- size the keyboard for THIS panel (fresh installs only) ---
-# The shipped geometry suits a 1280x800 Steam Deck. On any other panel it would be the
-# wrong width and, on a shorter screen, hang off the bottom. Derive it from the internal
-# display instead: full width, 55% height (capped), docked to the bottom edge. The
-# keyboard clamps at runtime too, so this only makes the first launch look right.
-PANEL_W=""; PANEL_H=""
-if [ "$FRESH" = 1 ] && command -v kscreen-doctor >/dev/null 2>&1; then
-  eval "$(python3 - <<'PY' 2>/dev/null
-import json, subprocess
-try:
-    data = json.loads(subprocess.check_output(["kscreen-doctor", "-j"], text=True, timeout=5))
-except Exception:
-    raise SystemExit(0)
-outs = [o for o in data.get("outputs", []) if o.get("enabled")]
-if not outs:
-    raise SystemExit(0)
-def size(o):
-    mode = next((m for m in (o.get("modes") or []) if m.get("id") == o.get("currentModeId")), {})
-    s = mode.get("size") or o.get("size") or {}
-    return s.get("width"), s.get("height")
-internal = next((o for o in outs if (o.get("name") or "").lower().startswith("edp")), outs[0])
-w, h = size(internal)
-if w and h:
-    print(f'PANEL_W={int(w)}; PANEL_H={int(h)}')
-PY
-)"
-fi
-if [ -n "$PANEL_W" ] && [ -n "$PANEL_H" ]; then
-  say "Sizing for this panel: ${PANEL_W}x${PANEL_H}"
-  python3 - "$CFG/config.json" "$PANEL_W" "$PANEL_H" <<'PY'
-import json, sys
-p, W, H = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
-d = json.load(open(p))
-h = min(int(H * 0.55), max(240, int(H * 0.55)))          # 55% of the panel
-big = min(int(H * 0.64), H)
-d["geometry"] = {"x": 0, "y": H - h, "w": W, "h": h}
-d["big_geometry"] = {"x": 0, "y": H - big, "w": W, "h": big}
-json.dump(d, open(p, "w"), indent=2)
-PY
-fi
+# --- work out the bottom dock for THIS panel (for the initial KWin rule) ---
+# The keyboard computes this itself at runtime from dock_height_frac; this only stops the
+# forced rule flashing the window at the wrong size on the very first show.
+PANEL_RECT="$(python3 "$HERE/bin/handheld-kbd-dock-rect" 2>/dev/null || true)"
 
 # --- KWin translucency script ---
 # Generated, never copied: a static copy used to be installed here and it diverged from
@@ -250,14 +215,7 @@ if command -v kwriteconfig6 >/dev/null 2>&1; then
   # on first show. The keyboard rewrites both live (move key, big mode), so this is just
   # the starting point — but on a panel that isn't 1280x800 the old hardcoded values put
   # the window partly off-screen until something moved it.
-  RULE_GEOM="$(python3 -c '
-import json, sys
-try:
-    g = json.load(open(sys.argv[1]))["geometry"]
-    print("%d,%d %d,%d" % (g["x"], g["y"], g["w"], g["h"]))
-except Exception:
-    print("0,378 1280,422")
-' "$CFG/config.json" 2>/dev/null || echo "0,378 1280,422")"
+  RULE_GEOM="${PANEL_RECT:-0,378 1280,422}"
   RULE_POS="${RULE_GEOM%% *}"; RULE_SIZE="${RULE_GEOM##* }"
   "${K[@]}" position "$RULE_POS";  "${K[@]}" positionrule 2
   "${K[@]}" size "$RULE_SIZE";     "${K[@]}" sizerule 2
