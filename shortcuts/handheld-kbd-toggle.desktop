@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Handheld Keyboard
+GenericName=On-screen keyboard
+Comment=Show or hide the keyboard without going through Steam
+Icon=input-keyboard
+Terminal=false
+Exec=__BIN__/handheld-kbd-toggle
+Categories=Utility;Accessibility;
+Keywords=keyboard;osk;onscreen;

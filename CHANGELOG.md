@@ -9,6 +9,50 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.0.10 — The Steam Deck keeps its trackpads
+
+### Fixed
+
+- **The trackpads and stick pointer keep working while the keyboard is up.** On a Steam
+  Deck the keyboard is summoned by Steam's own on-screen keyboard appearing, and we hid
+  that keyboard by setting its opacity to zero. The window stayed mapped, so Steam went on
+  believing its keyboard was open — and while it believes that, it forces the controller
+  into its "KB ActionSet", where the sticks and trackpads navigate *that* keyboard instead
+  of moving the desktop pointer. Steam says so in its own log:
+
+  ```
+  Set OSK active 1 and appid 413080
+  OnFocusWindowChanged On Screen Keyboard Forcing to window type: KB ActionSet, AppID 769
+  ```
+
+  So you got a keyboard you could only use by touch, and no pointer at all until Steam was
+  restarted. Steam's keyboard is now closed rather than hidden, which makes Steam set
+  OSK-active back to 0 and reload the desktop controller config. Fixes #14.
+
+  This never affected the Legion Go, where the hardware button is remapped through
+  InputPlumber and Steam's keyboard is never involved.
+
+- **The hardware keyboard button toggles again.** Closing Steam's keyboard means Steam no
+  longer reports a second press as a close — it just opens a fresh one — so the button is
+  handled as a toggle in the compositor rather than mirroring Steam's show and hide.
+
+- **A session that is already stuck recovers without restarting Steam.** Loading the KWin
+  script closes any Steam keyboard left over from before, and `handheld-kbd-fix-pointer`
+  does the same on demand. It no longer restarts Steam: a half-started Steam client leaves
+  you with no pointer at all, which is worse than what it was fixing.
+
+- **`handheld-kbd-ctl` starts the keyboard under the user service manager.** Started from
+  an SSH shell it used to inherit no display and no session bus, and came up unable to draw
+  or to answer on DBus — precisely when you are least able to debug it.
+
+### Added
+
+- **Application-menu shortcuts.** Show/hide, restart, stop, reset position, and fix the
+  trackpad pointer. Typing a command is the one thing you cannot do when the keyboard is
+  the problem, so every recovery action is also something you can click.
+- **`handheld-kbd-ctl`** — `status`, `start`, `stop`, `restart`, `reset` for the keyboard
+  and its supervisor, without logging out. Every action is safe to repeat.
+
 ## v1.0.9 — The tick actually holds the position
 
 ### Fixed

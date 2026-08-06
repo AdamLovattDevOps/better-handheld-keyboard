@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Fix Trackpad and Stick Pointer
+Comment=Close Steam's leftover on-screen keyboard, which holds the controller in keyboard mode
+Icon=input-touchpad
+Terminal=false
+Exec=__BIN__/handheld-kbd-fix-pointer
+Categories=Utility;Accessibility;
+Keywords=trackpad;pointer;mouse;stick;steam;

@@ -75,9 +75,12 @@ elif mode == "custom" and g.get("w") and g.get("h"):
 else:
     place = "dock"
 print(place, max(0.15, min(frac, 0.95)),
-      int(g.get("x", 0)), int(g.get("y", 0)), int(g.get("w", 0)), int(g.get("h", 0)))' 2>/dev/null)
+      int(g.get("x", 0)), int(g.get("y", 0)), int(g.get("w", 0)), int(g.get("h", 0)),
+      1 if d.get("kwin_focus_restore", True) else 0,
+      1 if d.get("kwin_fullscreen_lift", True) else 0)' 2>/dev/null)
 set -- $DOCK_CFG
 PLACE="${1:-dock}"; FRAC="${2:-0.42}"; CX="${3:-0}"; CY="${4:-0}"; CW="${5:-0}"; CH="${6:-0}"
+FOCUS="${7:-1}"; LIFT="${8:-1}"
 # An explicit --dock wins: free-move has to turn docking off even though the config still
 # says "bottom", or the keyboard is dragged straight back the moment the user lets go.
 # --dock 0 means the user is dragging: no placement at all until they finish.
@@ -101,9 +104,13 @@ for v in CX CY CW CH; do
 done
 
 if [ "$HIDE_STEAM" = 1 ]; then
+    # Transparent, not merely lowered: it must not flash on screen in the moment
+    # between mapping and us closing it.
     STEAM_RULE="else if (cap.indexOf(\"$NAME\") !== -1) w.opacity = 0.0;"
+    CLOSE_STEAM=1
 else
     STEAM_RULE="// Steam's OSK left alone: this keyboard has not proven it can appear yet."
+    CLOSE_STEAM=0
 fi
 
 [ "$OUT" = "/dev/stdout" ] || mkdir -p "$(dirname "$OUT")"
@@ -119,6 +126,19 @@ var REPORT = $REPORT;   // 1 = tell the keyboard where it ends up (free-move is 
 var PLACE = "$PLACE";  // "dock" | "custom" | "none" (the user is moving it by hand)
 var FRAC = $FRAC;      // dock height as a fraction of the usable area
 var CUSTOM = { x: $CX, y: $CY, width: $CW, height: $CH };
+// Everything below runs inside the compositor's own thread, so each of these is optional:
+// if a device turns out to be unhappy with us touching focus or stacking, it can be turned
+// off in config.json (kwin_focus_restore / kwin_fullscreen_lift) without losing the
+// keyboard itself, which only needs opacity, the mirror trigger and placement.
+var FOCUS_RESTORE = $FOCUS;
+var FULLSCREEN_LIFT = $LIFT;
+// Close Steam's on-screen keyboard rather than just hiding it. While Steam believes its
+// OSK is open it forces the controller into its "KB ActionSet", where the sticks and
+// trackpads navigate that keyboard instead of moving the desktop pointer — so a Steam
+// Deck loses its trackpad and stick mouse for as long as the window exists, even at
+// zero opacity, and only gets them back when Steam restarts. Closing the window makes
+// Steam set OSK-active back to 0 and reload the desktop controller config.
+var CLOSE_STEAM = $CLOSE_STEAM;
 var demoted = {};   // internalId -> true : fullscreen windows WE dropped to keepBelow
 var lastReal = null;   // most recent focusable window the user was on (for focus restore)
 
@@ -156,6 +176,7 @@ function kbdShown(){
 // activeFullScreen, so dropping the fullscreen window to keepBelow (BelowLayer)
 // lets the OSK float on top. Restore it when the OSK hides / leaves fullscreen.
 function applyStack(){
+    if (!FULLSCREEN_LIFT) return;
     try {
         var shown = kbdShown();
         var list = workspace.windowList();
@@ -269,31 +290,57 @@ function watchGeometry(w){
     // emits no signal we still hold a value — the pre-drag dock position — and finishing
     // the move would "save" that and snap the keyboard back to the dock.
 }
+// Steam's OSK opening is the hardware keyboard button being pressed. Deal with it:
+// summon or dismiss ours, then get Steam's out of the way for real.
+//
+// Closing it means Steam no longer tells us when the button is pressed a second time —
+// it just opens a fresh OSK — so the button has to toggle here rather than relying on
+// Steam's own show/hide. The guard is against Steam re-mapping the window on its way
+// out, which would otherwise read as a second press and immediately undo the first.
+var lastSteamOsk = 0;
+function onSteamOsk(w){
+    var now = new Date().getTime();
+    if (now - lastSteamOsk < 700) { if (CLOSE_STEAM) closeSteamOsk(w); return; }
+    lastSteamOsk = now;
+    callKbd(CLOSE_STEAM ? "Toggle" : "Show");
+    if (CLOSE_STEAM) closeSteamOsk(w);
+}
+
+function closeSteamOsk(w){
+    try { w.closeWindow(); } catch(e){}
+}
+
 function onAdded(w){
     setOp(w); watch(w); dockKbd(w); applyStack();
-    if (MIRROR && isSteamOsk(w)) callKbd("Show");
+    if (MIRROR && isSteamOsk(w)) onSteamOsk(w);
     // When our OSK maps, the summon (touch gesture / map) may have shifted focus.
     // Re-assert the window the user was on so typed keys land there. keepBelow keeps
     // a demoted fullscreen window below the OSK even once it is active again.
-    if (isKbd(w) && lastReal) {
+    if (FOCUS_RESTORE && isKbd(w) && lastReal) {
         // only re-activate if focus actually moved, so we don't needlessly re-raise the
         // window and disturb the text caret when the summon didn't defocus it.
         try { if (workspace.activeWindow !== lastReal) workspace.activeWindow = lastReal; } catch(e){}
     }
 }
 
-workspace.windowActivated.connect(function(w){ if (focusable(w)) lastReal = w; });
+if (FOCUS_RESTORE) workspace.windowActivated.connect(function(w){ if (focusable(w)) lastReal = w; });
 workspace.windowList().forEach(function(w){
     setOp(w); watch(w);
     // Existing windows: in custom placement, mark as already placed so a script reload
     // leaves them untouched. Docking still re-asserts, because that is ours to compute.
     if (PLACE === "custom") placedCustom[""+w.internalId] = true;
     dockKbd(w);
+    // A Steam OSK left over from before this script loaded is still holding the
+    // controller in KB ActionSet. Close it on sight — this is what gives a Deck its
+    // trackpad and stick pointer back without restarting Steam.
+    if (MIRROR && CLOSE_STEAM && isSteamOsk(w)) closeSteamOsk(w);
 });
 workspace.windowAdded.connect(onAdded);
 workspace.windowRemoved.connect(function(w){
     applyStack();
-    if (MIRROR && isSteamOsk(w)) callKbd("Hide");
+    // Only mirror the close when we are not the ones closing it — otherwise our own
+    // closeWindow() would hide the keyboard we just summoned.
+    if (MIRROR && !CLOSE_STEAM && isSteamOsk(w)) callKbd("Hide");
 });
 applyStack();
 EOF

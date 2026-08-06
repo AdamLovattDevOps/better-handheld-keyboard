@@ -14,8 +14,12 @@ rm -f "$HOME/.local/bin/handheld-kbd.py" \
       "$HOME/.local/bin/handheld-kbd-swap.sh" \
       "$HOME/.local/bin/handheld-kbd-relogin" \
       "$HOME/.local/bin/handheld-kbd-ip-remap" \
+      "$HOME/.local/bin/handheld-kbd-ctl" \
       "$HOME/.config/autostart/handheld-kbd.desktop" \
       "$HOME/.config/autostart/handheld-kbd-swap.desktop"
+rm -f "$HOME"/.local/share/applications/handheld-kbd-*.desktop
+command -v update-desktop-database >/dev/null 2>&1 && \
+  update-desktop-database "$HOME/.local/share/applications" 2>/dev/null
 rm -rf "$HOME/.local/share/kwin/scripts/handheld-kbd-opacity"
 
 # restore the hardware keyboard button (we remapped it via InputPlumber)
