@@ -251,6 +251,7 @@ class OSK(Gtk.Window):
         self.size_btn = None
         self.opacity_btn = None
         self.move_btn = None
+        self.hide_cb = None            # set by main(); keeps the hide path single-sourced
         self.big = bool(config.get("start_big", False))
         # Unlocked = KWin's rule is on Remember, so the user can drag/resize by hand.
         # Always starts locked; an unlocked keyboard that got respawned would drift.
@@ -791,6 +792,25 @@ class OSK(Gtk.Window):
             except Exception:
                 pass
 
+    def _placement_key(self):
+        """Everything a placement depends on. Compared to skip needless compositor work."""
+        outs = self._outputs()
+        return (self.big, self.unlocked, self.cfg.get("position_mode", "bottom"),
+                json.dumps(self.cfg.get("geometry", {}), sort_keys=True),
+                tuple((o["name"], o["x"], o["y"], o["w"], o["h"]) for o in outs))
+
+    def ensure_placed(self, force=False):
+        """Place the window, but only if the placement actually needs redoing.
+
+        Called on every show. Re-running the full path each time meant a kwriteconfig write,
+        a KWin reconfigure and a script reload before the keyboard could appear, which is
+        the slowest possible way to answer a button press."""
+        key = self._placement_key()
+        if not force and key == getattr(self, "_placed_key", None):
+            return
+        self._placed_key = key
+        self.apply_size()
+
     def apply_size(self):
         """Toggle between the normal centred layout and 'big' mode, where every key
         stretches to fill the whole window (both axes) so no screen space is wasted."""
@@ -971,7 +991,9 @@ class OSK(Gtk.Window):
             return None
 
     def on_move(self, btn):
-        """Toggle between locked (docked, forced) and unlocked (drag it anywhere)."""
+        """Free move: turn the drag bar on, put the keyboard wherever you like, turn it off
+        again. Leaving free-move keeps it exactly where you left it; ⤓ (reset) is what puts
+        it back to the default dock."""
         if self._stray_tap():
             return
         if GAMEMODE:
@@ -982,8 +1004,8 @@ class OSK(Gtk.Window):
         if self.unlocked:
             self._set_rule_mode(4)              # Remember: KWin lets it be moved/resized
         else:
-            # Lock means "pin it exactly here" — never move the window. Read back where
-            # the user left it, force that rect, and remember it as the custom position.
+            # Leaving free-move never moves the window. Read back where it ended up, hold
+            # it there, and remember it as the custom position.
             g = self._read_rule_geometry()
             if g:
                 outs = self._outputs()
@@ -1002,19 +1024,22 @@ class OSK(Gtk.Window):
                 # Couldn't read it back: still lock, but leave the window alone rather
                 # than yanking it somewhere the user didn't choose.
                 print("handheld-kbd: could not read back the dragged position; "
-                      "locking in place", file=sys.stderr)
+                      "leaving the window where it is", file=sys.stderr)
                 self._set_rule_mode(2)
         self._apply_handle()
 
     def on_reset(self, btn):
-        """Put the keyboard back to the default bottom dock, forgetting a custom spot."""
+        """Reset: back to the default bottom dock, forgetting wherever it was moved to."""
         if self._stray_tap():
             return
+        was_free = self.unlocked
         self.unlocked = False
+        if was_free:
+            self._set_rule_mode(2)           # stop KWin remembering the dragged spot
         self.cfg["position_mode"] = "bottom"
         self._persist("position_mode", "bottom")
         self._last_rect = None
-        self.apply_size()                    # switches the rule off and reloads the script
+        self.ensure_placed(force=True)       # switches the rule off and reloads the script
         self._apply_handle()
 
     def _apply_handle(self):
@@ -1027,7 +1052,7 @@ class OSK(Gtk.Window):
                 self.handle.hide()
                 self.handle.set_no_show_all(True)
         if self.move_btn:
-            self._set_label(self.move_btn, "🔓" if self.unlocked else "✥", "")
+            self._set_label(self.move_btn, "✓" if self.unlocked else "✥", "")
             ctx = self.move_btn.get_style_context()
             (ctx.add_class if self.unlocked else ctx.remove_class)("unlocked")
 
@@ -1047,7 +1072,7 @@ class OSK(Gtk.Window):
             return ev
 
         drag = Gtk.EventBox()
-        drag.add(Gtk.Label(label="⇕  drag to move  ⇕"))
+        drag.add(Gtk.Label(label="drag to move  ·  ✓ when done"))
         drag.get_style_context().add_class("handle-drag")
         drag.connect("button-press-event", self._on_drag_press)
         bar.pack_start(grip(Gdk.WindowEdge.NORTH_WEST, "⤡"), False, False, 0)
@@ -1164,17 +1189,31 @@ class OSK(Gtk.Window):
         self._track(kc, mods)
 
     def dismiss(self):
-        """Hide button: hide now and tell the mirror daemon to stay hidden until the
-        next time the device's keyboard button is pressed (so it doesn't pop right back)."""
+        """Hide key: put us away, and in mirror mode get rid of Steam's on-screen keyboard
+        too — an invisible-but-mapped window of theirs still swallows every tap in its
+        rectangle (ValveSoftware/steam-for-linux#9099). One shot, on the press; this used
+        to be a latch that a 10Hz poll picked up."""
         if self._stray_tap():
             return
-        try: open("/tmp/handheld-kbd.suppress", "w").write("1")
-        except Exception: pass
-        try: open("/tmp/handheld-kbd.vis", "w").write("0")
-        except Exception: pass
+        if self.cfg.get("mirror", True) and not GAMEMODE:
+            self._dismiss_steam_osk()
+        if self.hide_cb is not None:
+            self.hide_cb()               # routes through main()'s hide, keeping state in sync
+            return
         if GAMEMODE:
             self.gm_hide()
         self.hide()
+
+    def _dismiss_steam_osk(self):
+        """Unmap Steam's OSK, once, in the background so the hide stays instant."""
+        script = (
+            'for w in $(xwininfo -root -tree 2>/dev/null | grep -i "$1" '
+            '| grep -oE "0x[0-9a-f]+"); do xdotool windowunmap "$w" 2>/dev/null; done')
+        try:
+            subprocess.Popen(["sh", "-c", script, "sh", "Steam Input On-screen Keyboard"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception as ex:
+            print(f"handheld-kbd: could not dismiss Steam's OSK ({ex})", file=sys.stderr)
 
     # ---- Game Mode (gamescope overlay) ----
     def _xprop(self, target, atom, val):
@@ -1220,6 +1259,56 @@ class OSK(Gtk.Window):
             try: self._xprop(hex(gw.get_xid()), "STEAM_INPUT_FOCUS", 0)
             except Exception: pass
         self._root_touch_mode(self.orig_touch_mode if self.orig_touch_mode is not None else 4)
+
+
+SERVICE_XML = """
+<node>
+  <interface name='org.handheld.Keyboard'>
+    <method name='Show'/>
+    <method name='Hide'/>
+    <method name='Toggle'/>
+  </interface>
+</node>
+"""
+
+_service_keepalive = []
+
+
+def setup_service(show, hide, toggle):
+    """Expose Show/Hide/Toggle on the session bus.
+
+    This is what replaced polling. The KWin script calls these the moment Steam's
+    on-screen keyboard maps or unmaps, so the swap daemon no longer has to walk the window
+    tree ten times a second to notice — that poll was both the latency in summoning the
+    keyboard and a constant drip of xwininfo/xprop processes."""
+    from gi.repository import Gio
+    handlers = {"Show": show, "Hide": hide, "Toggle": toggle}
+
+    def on_call(conn, sender, path, iface, method, params, invocation):
+        fn = handlers.get(method)
+        if fn is not None:
+            try:
+                fn()
+            except Exception as ex:
+                print(f"handheld-kbd: {method} failed ({ex})", file=sys.stderr)
+        invocation.return_value(None)
+
+    def on_acquired(conn, name, _user=None):   # GLib calls this with 2 args
+        try:
+            node = Gio.DBusNodeInfo.new_for_xml(SERVICE_XML)
+            # register_object() is deprecated in newer PyGObject; the *_with_closures form
+            # is the replacement but doesn't exist everywhere yet.
+            reg = getattr(conn, "register_object_with_closures", None) or conn.register_object
+            reg("/org/handheld/Keyboard", node.interfaces[0], on_call)
+        except Exception as ex:
+            print(f"handheld-kbd: service registration failed ({ex})", file=sys.stderr)
+
+    try:
+        oid = Gio.bus_own_name(Gio.BusType.SESSION, "org.handheld.Keyboard",
+                               Gio.BusNameOwnerFlags.REPLACE, on_acquired, None, None)
+        _service_keepalive.append(oid)
+    except Exception as ex:
+        print(f"handheld-kbd: could not own the service name ({ex})", file=sys.stderr)
 
 
 _dbus_keepalive = []   # keep the bus connection alive or the subscription is GC'd
@@ -1522,12 +1611,21 @@ def main():
     open("/tmp/handheld-kbd.pid", "w").write(str(os.getpid()))
     VIS = "/tmp/handheld-kbd.vis"
 
+    state = {"shown": False}
+
     def _setvis(v):
+        # The file is for the daemon's benefit; the in-memory flag is what we act on, so a
+        # show/hide never waits on disk.
+        state["shown"] = (v == "1")
         try: open(VIS, "w").write(v)
         except Exception: pass
 
     def _show(*_):
-        w.apply_size()                    # re-anchor to the internal panel (handles display hotplug)
+        if state["shown"]:
+            return True                   # already up: nothing to do, no flicker
+        # Placement is compositor work (rule writes, script reloads); doing it on every
+        # show made summoning slow. Only redo it when something that affects it changed.
+        w.ensure_placed()
         w.show_all()
         if GAMEMODE:                      # set overlay atoms once gamescope has mapped us
             GLib.timeout_add(250, w.gm_show)
@@ -1535,24 +1633,22 @@ def main():
         _setvis("1"); return True
 
     def _hide(*_):
+        if not state["shown"]:
+            return True
         if GAMEMODE: w.gm_hide()
         w.hide(); _setvis("0"); return True
+    w.hide_cb = _hide                 # the hide key routes through here, so state stays in sync
     GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, _show, None)
     GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR2, _hide, None)
 
     def _toggle():
-        cur = "0"
-        try: cur = open(VIS).read().strip()
-        except Exception: pass
-        (_hide if cur == "1" else _show)()
+        (_hide if state["shown"] else _show)()
 
     def _focus_show():
-        cur = "0"
-        try: cur = open(VIS).read().strip()
-        except Exception: pass
-        if cur != "1":                    # show-only, idempotent (no auto-hide)
+        if not state["shown"]:            # show-only, idempotent (no auto-hide)
             _show()
 
+    setup_service(_show, _hide, _toggle)  # DBus service: how KWin tells us Steam's OSK moved
     setup_dbus_trigger(config, _toggle)   # seamless hardware-button trigger (InputPlumber)
     setup_hotkey(config, _toggle)         # optional evdev hotkey (attached kbd / Steam Input chord)
     setup_focus_trigger(config, _focus_show)  # optional: auto-show when a text field is focused

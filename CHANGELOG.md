@@ -9,6 +9,36 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.0.8 — Event-driven, and free move instead of lock
+
+### Fixed
+
+- **The swap daemon no longer polls.** In mirror mode — which is what every device without
+  a dedicated keyboard button uses, including a stock Steam Deck — it walked the whole X
+  window tree ten times a second (`xwininfo` + `grep`, plus an `xprop` write per match) to
+  notice Steam's on-screen keyboard appearing, and unmapped that window through `xdotool`.
+  That is a constant drip of processes poking Steam's own windows, on a device where Steam
+  Input drives the trackpads. The KWin script now calls the keyboard over DBus the moment
+  that window maps or unmaps, and the daemon's loop is a 2-second supervisor that only
+  respawns the keyboard and keeps the script loaded. Measured on a Legion Go 2: the old
+  daemon used 27.2s of CPU in a session, the new one 1.4s, and 0 ticks per 5s at idle.
+- **Summoning is fast and repeatable.** Showing the keyboard used to redo placement every
+  time — a config write, a KWin reconfigure and a script reload before anything appeared.
+  Placement is now cached and only redone when something it depends on changes (mode, size,
+  display layout). Show/hide round trip over DBus measured at 3-6 ms, 28 ms on the first
+  show when placement really does run. Show and hide are also idempotent, so a repeat
+  press can't double-fire or leave the state file disagreeing with the window.
+- **The hide key dismisses Steam's keyboard directly** instead of setting a latch for the
+  poll to pick up, so it happens on the press rather than up to 100 ms later.
+- The keyboard's own output is no longer thrown away when the daemon respawns it; it goes
+  to `/tmp/handheld-kbd-out.log`, which is where a startup failure would show up.
+
+### Changed
+
+- **Free move, not lock.** ✥ turns free movement on (drag bar appears, KWin lets the window
+  be moved and resized) and off again (it stays exactly where you left it). The key shows
+  ✓ while free movement is on. ⤓ is unchanged: back to the default bottom dock.
+
 ## v1.0.7 — Correct at any resolution and any scale
 
 v1.0.6 docked the keyboard using the display's *physical* pixels. KWin positions windows

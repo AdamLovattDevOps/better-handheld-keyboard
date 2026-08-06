@@ -41,9 +41,9 @@ So I built the keyboard I wanted instead. Here's what it does differently:
 - **Same place on every device.** It docks flush with the bottom edge, full
   width, at a fixed fraction of the panel height — a Deck LCD, a Deck OLED and a
   Legion Go 2 all get the same keyboard in the same spot.
-- **Or put it where you want it.** The ✥ key unlocks it: a bar appears along the
-  top, drag it anywhere, grab either end to resize, then press ✥ again to lock it
-  exactly there. ⤓ puts it back to the bottom dock.
+- **Or put it where you want it.** ✥ turns on free movement: a bar appears along
+  the top, drag it anywhere, grab either end to resize, then press ✓ to finish —
+  it stays where you left it. ⤓ puts it back to the bottom dock.
 - **Swipe typing.** Drag across the letters instead of tapping them. Taps are
   unaffected — a drag only counts once it's unmistakably not one.
 - **Optional summon gestures.** Two-finger swipe up from the bottom edge
