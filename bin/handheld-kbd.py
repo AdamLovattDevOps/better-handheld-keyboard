@@ -221,14 +221,14 @@ button.suggest:active {{ background: {t['key_active']}; }}
 button.suggest-empty {{ background: transparent; border-color: transparent; }}
 window.gm {{ background-color: rgba(0,0,0,0); }}
 .gm-keys {{ background-color: rgba(12,12,12,0.82); }}
-.handle-drag {{ background: {t.get('handle_bg', '#1e2733')};
-               border-top: 2px solid {t['key_active']}; }}
-.handle-drag label {{ color: {t.get('handle_fg', '#9fb4c7')}; font-size: 13px;
-                     letter-spacing: 1px; }}
-.handle-grip {{ background: {t.get('handle_bg', '#1e2733')};
-               border-top: 2px solid {t['key_active']}; padding: 0 16px; }}
-.handle-grip label {{ color: {t['key_active']}; font-size: 17px; }}
-button.unlocked {{ background: {t['key_active']}; color: #06121c; font-weight: bold; }}
+/* Free movement is self-evident once the bar is there — a lit-up blue block on top of
+   that is noise. Muted bar, muted grips, and the key gets an outline rather than a fill. */
+.handle-drag {{ background: {t.get('handle_bg', '#1e2733')}; }}
+.handle-drag label {{ color: {t.get('handle_fg', '#9fb4c7')}; font-size: 12px; }}
+.handle-grip {{ background: {t.get('handle_bg', '#1e2733')}; padding: 0 16px; }}
+.handle-grip label {{ color: {t.get('handle_fg', '#9fb4c7')}; font-size: 15px; }}
+button.unlocked {{ background: {t['special_bg']}; color: {t.get('handle_fg', '#9fb4c7')};
+                  border: 1px solid {t.get('handle_fg', '#9fb4c7')}; }}
 """.encode()
 
 
@@ -999,6 +999,8 @@ class OSK(Gtk.Window):
         except Exception:
             return
         if w >= 160 and h >= 80:
+            if self.reported_rect is None:
+                print(f"handheld-kbd: KWin reports geometry {x},{y} {w}x{h}", file=sys.stderr)
             self.reported_rect = {"x": x, "y": y, "w": w, "h": h}
 
     def _reload_kwin_script(self, report=False):
@@ -1060,19 +1062,37 @@ class OSK(Gtk.Window):
             # Leaving free-move must never move the window. Ask KWin where it is, give the
             # reply a moment to land (the main loop has to stay free to receive it), then
             # pin it exactly there.
+            self.reported_rect = None     # never finish on a value from before the drag
             self.request_geometry()
-            GLib.timeout_add(250, self._finish_move)
+            self._finish_tries = 0
+            # Wait for the answer instead of guessing how long it takes. A fixed delay was
+            # a race: when the reply landed late we had already given up, and giving up
+            # means the script re-docks — which is exactly the "✓ resets it" report.
+            GLib.timeout_add(100, self._finish_move)
         self._apply_handle()
 
     def _finish_move(self):
         g = self.reported_rect
         if not g:
+            self._finish_tries = getattr(self, "_finish_tries", 0) + 1
+            if self._finish_tries <= 20:          # up to ~2s, re-asking as we go
+                if self._finish_tries in (3, 7, 12, 17):
+                    self.request_geometry()
+                return True                       # keep waiting
             # No answer: freeze by doing nothing. Forcing the rect from kwinrulesrc here is
             # what used to yank the keyboard back to the dock, because that file still holds
             # the old forced position until the window closes.
-            print("handheld-kbd: no geometry from KWin; leaving the keyboard where it is",
-                  file=sys.stderr)
+            # Never leave it in docking mode after a move: docking re-asserts itself on the
+            # next geometry change, which is the keyboard snapping back a moment later —
+            # intermittent, because it only happens when the reply was too slow. "free"
+            # means nothing places the window at all, so where the user left it is where it
+            # stays. ⤓ is how you get back to the dock.
+            print("handheld-kbd: no geometry from KWin; freezing placement so it cannot "
+                  "snap back", file=sys.stderr)
+            self.cfg["position_mode"] = "free"
+            self._persist("position_mode", "free")
             self._reload_kwin_script(report=False)
+            self._placed_key = None
             return False
         # Stored exactly as KWin reports it, in absolute compositor coordinates, with no
         # clamping: a keyboard you moved by hand should stay where you put it, including
