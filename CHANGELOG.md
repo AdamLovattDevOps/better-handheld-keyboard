@@ -9,6 +9,33 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.0.7 — Correct at any resolution and any scale
+
+v1.0.6 docked the keyboard using the display's *physical* pixels. KWin positions windows
+in *logical* ones, and the two are only the same at scale 1. A Legion Go 2 is a 1920x1200
+panel at scale 1.5 — a 1280x800 desktop — so a 1920-wide rect went mostly off the side.
+
+### Fixed
+
+- **Display scaling.** Screen geometry now comes from GDK, which reports the same logical
+  space the compositor uses, so any scale factor (including fractional) is handled without
+  arithmetic on our part. The `kscreen-doctor` fallback divides the mode size by the
+  output's scale, and `handheld-kbd-dock-rect` does the same.
+- **The panel is no longer covered, and the keyboard no longer hangs off the bottom.**
+  Docking is now done by the KWin script using `clientArea(MaximizeArea)` — the only
+  source that knows the usable area (logical, panels excluded). In docked mode the window
+  rule is set to DontAffect so it can't fight the script; the rule is only forced for a
+  position you locked yourself.
+- **Keys are sized to the dock height before the window is placed.** Previously they kept
+  their natural height, the window's minimum exceeded the dock height, and the compositor
+  returned a taller window whose bottom fell off the screen (measured: a 336px dock coming
+  back as 438px). Key height is now derived from the target height, so the keyboard takes
+  the same fraction of the display on an 800px panel as on a 1200px one. The script also
+  re-anchors to whatever height the client insists on, as a backstop.
+
+Measured on a Legion Go 2 (1920x1200 @ 1.5): keyboard `0,440 1280x336` against a work area
+of `0,0 1280x776` — full width, bottom edge flush with the top of the Plasma panel.
+
 ## v1.0.6 — Same place on every device
 
 ### Changed

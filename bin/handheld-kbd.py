@@ -705,8 +705,8 @@ class OSK(Gtk.Window):
         if self._stray_tap():
             return
         self.big = not self.big
+        self._persist_big()                  # written first: the script reads it back
         self.apply_size()
-        self._persist_big()
 
     def _persist_big(self):
         """Write the current mode back to config.json's start_big so it survives both
@@ -806,20 +806,23 @@ class OSK(Gtk.Window):
         kh = self.cfg.get("big_key_h", 100) if (big and GAMEMODE) else self.norm_kh
         g = (self.cfg.get("big_geometry", DEFAULT_CONFIG["big_geometry"])
              if big else self.cfg.get("geometry", DEFAULT_CONFIG["geometry"]))
+        rect = None
         if not GAMEMODE:
-            # The suggestion row eats into a window whose size is FORCED by the KWin
-            # rule. Left alone, full-height keys push the window's minimum past that
-            # forced height, and an over-constrained Wayland window keeps its input
-            # region but stops painting — it takes taps while being invisible. So the
-            # keys shrink to fit whatever the suggestion row leaves behind.
-            # apply_size() runs before the window is realised, where the row still
-            # measures as ~0 — so trust the configured height (plus its margins) and
-            # only prefer the measured value once it is real and larger.
+            # Work out the target window height FIRST, then size the keys to fit inside it.
+            # Without this the keys keep their natural height, the window's minimum height
+            # exceeds the dock height, and the compositor hands back a taller window whose
+            # bottom hangs off the screen. It also means the keyboard occupies the same
+            # fraction of the display on a 800px panel as on a 1200px one.
+            rect = self._slot_rect(g, big)
+            # The suggestion row eats into that height. apply_size() also runs before the
+            # window is realised, where the row measures as ~0 — so trust the configured
+            # height (plus its margins) and only prefer the measured value once it is real.
             bar = 0
             if self.sugbar is not None:
                 bar = max(int(self.cfg.get("suggest_height", 44)) + 8,
                           self.sugbar.get_preferred_height()[0])
-            fit = (g["h"] - bar - 8) // self.nrows        # 8 = grid top+bottom margins
+            handle = (int(self.cfg.get("handle_height", 30)) + 4) if self.unlocked else 0
+            fit = (rect["h"] - bar - handle - 8) // self.nrows   # 8 = grid margins
             kh = max(24, min(kh, fit))
         for child in self.grid.get_children():
             child.set_vexpand(big)
@@ -831,43 +834,70 @@ class OSK(Gtk.Window):
         # the bottom) — the taller key rows above already grow the strip, no resize/rule.
         if GAMEMODE:
             return
-        rect = self._slot_rect(g, big)
+        rect = rect or self._slot_rect(g, big)
         self.resize(rect["w"], rect["h"])
         self.move(rect["x"], rect["y"])
-        if not self.unlocked:                # unlocked: the user is placing it by hand
-            self._apply_kwin_geometry(rect)
+        if self.unlocked:                    # the user is placing it by hand
+            return
+        if self.cfg.get("position_mode", "bottom") == "custom":
+            self._apply_kwin_geometry(rect)  # pin the spot they locked
+        else:
+            # Docked: KWin's script does the placing, because only KWin knows the work
+            # area (logical pixels, panels excluded). Stop the rule fighting it.
+            self._set_rule_mode(1)           # DontAffect
+            self._reload_kwin_script()
+
+    def _is_internal(self, name):
+        want = (self.cfg.get("internal_output", "") or "").lower()
+        n = (name or "").lower()
+        return n.startswith(want) if want else n.startswith("edp")
 
     def _outputs(self):
-        """Enabled displays as [{name, x, y, w, h, internal}], the internal panel first.
+        """Enabled displays as [{name, x, y, w, h, internal}], internal panel first, in
+        LOGICAL pixels — the coordinate space KWin rules and window positions use.
 
-        Empty list if kscreen-doctor isn't there or says nothing useful, in which case
-        callers fall back to the configured geometry as-is."""
-        want = (self.cfg.get("internal_output", "") or "").lower()
+        Scaling is the whole reason this is careful. A Legion Go 2 is a 1920x1200 panel at
+        scale 1.5, so the compositor's desktop is 1280x800: writing 1920-wide physical
+        pixels into a KWin rule puts the window mostly off the side of a 1280-wide desktop.
+        GDK reports exactly the logical space we need, so ask it first; kscreen-doctor is
+        the fallback and there we divide the mode size by the output's scale ourselves."""
         outs = []
         try:
-            data = json.loads(subprocess.check_output(
-                ["kscreen-doctor", "-j"], text=True, timeout=3))
-            for o in data.get("outputs", []):
-                if not o.get("enabled"):
-                    continue
-                pos = o.get("pos") or {}
-                # size comes from the current mode; fall back to the reported size
-                mode = next((m for m in (o.get("modes") or [])
-                             if m.get("id") == o.get("currentModeId")), {})
-                sz = mode.get("size") or o.get("size") or {}
-                name = o.get("name") or ""
-                if not sz.get("width") or not sz.get("height"):
-                    continue
-                outs.append({
-                    "name": name,
-                    "x": int(pos.get("x", 0)), "y": int(pos.get("y", 0)),
-                    "w": int(sz["width"]), "h": int(sz["height"]),
-                    "internal": (name.lower() == want if want
-                                 else name.lower().startswith("edp")),
-                })
-        except Exception:
-            return []
-        outs.sort(key=lambda o: (not o["internal"], o["x"], o["y"]))
+            display = Gdk.Display.get_default()
+            for i in range(display.get_n_monitors()):
+                m = display.get_monitor(i)
+                g = m.get_geometry()          # already logical on both X11 and Wayland
+                # GDK's model is like "eDP-1-AMS881KB01-0"; the connector is the head of it
+                name = (m.get_model() or "").strip()
+                outs.append({"name": name, "x": g.x, "y": g.y, "w": g.width, "h": g.height,
+                             "internal": self._is_internal(name), "primary": m.is_primary()})
+        except Exception as ex:
+            print(f"handheld-kbd: GDK monitors unavailable ({ex})", file=sys.stderr)
+        if not outs:
+            try:
+                data = json.loads(subprocess.check_output(
+                    ["kscreen-doctor", "-j"], text=True, timeout=3))
+                for o in data.get("outputs", []):
+                    if not o.get("enabled"):
+                        continue
+                    pos = o.get("pos") or {}
+                    mode = next((m for m in (o.get("modes") or [])
+                                 if m.get("id") == o.get("currentModeId")), {})
+                    sz = mode.get("size") or o.get("size") or {}
+                    if not sz.get("width") or not sz.get("height"):
+                        continue
+                    scale = float(o.get("scale") or 1) or 1.0
+                    name = o.get("name") or ""
+                    outs.append({
+                        "name": name,
+                        "x": int(pos.get("x", 0)), "y": int(pos.get("y", 0)),
+                        "w": int(round(int(sz["width"]) / scale)),
+                        "h": int(round(int(sz["height"]) / scale)),
+                        "internal": self._is_internal(name), "primary": False,
+                    })
+            except Exception:
+                return []
+        outs.sort(key=lambda o: (not o["internal"], not o.get("primary"), o["x"], o["y"]))
         return outs
 
     def _panel_origin(self):
@@ -902,6 +932,25 @@ class OSK(Gtk.Window):
         except Exception as ex:
             print(f"handheld-kbd: rule mode {mode} failed ({ex})", file=sys.stderr)
             return False
+
+    def _reload_kwin_script(self):
+        """Regenerate the KWin script and reload it. The script reads the dock settings out
+        of config.json, so this is how a mode/size change reaches the compositor."""
+        writer = os.path.expanduser("~/.local/bin/handheld-kbd-kwin-script")
+        opscript = os.path.expanduser(
+            "~/.local/share/kwin/scripts/handheld-kbd-opacity/contents/code/main.js")
+        if not os.access(writer, os.X_OK):
+            return
+        try:
+            subprocess.run([writer, "--out", opscript], check=False, timeout=5)
+            S = "org.kde.kwin.Scripting."
+            for args in (["unloadScript", "handheld-kbd-opacity"],
+                         ["loadScript", opscript, "handheld-kbd-opacity"],
+                         ["start"]):
+                subprocess.run(["qdbus6", "org.kde.KWin", "/Scripting", S + args[0]] + args[1:],
+                               check=False, timeout=3)
+        except Exception as ex:
+            print(f"handheld-kbd: kwin script reload failed ({ex})", file=sys.stderr)
 
     def _read_rule_geometry(self):
         """What KWin remembered while we were unlocked: {"x","y","w","h"} or None."""
@@ -965,8 +1014,7 @@ class OSK(Gtk.Window):
         self.cfg["position_mode"] = "bottom"
         self._persist("position_mode", "bottom")
         self._last_rect = None
-        self._set_rule_mode(2)
-        self.apply_size()
+        self.apply_size()                    # switches the rule off and reloads the script
         self._apply_handle()
 
     def _apply_handle(self):

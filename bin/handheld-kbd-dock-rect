@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Print the default bottom-dock rect for the internal panel, as `X,Y W,H`.
+"""Print the default bottom-dock rect for the internal panel, as `X,Y W,H`, in
+LOGICAL pixels (mode size divided by the display scale).
 
 The keyboard works this out for itself at runtime; the installer uses this so the forced
 KWin rule starts out matching, instead of flashing the window at the wrong size on the
@@ -36,7 +37,11 @@ def internal_panel():
     size = mode.get("size") or chosen.get("size") or {}
     if not size.get("width") or not size.get("height"):
         return None
-    return int(size["width"]), int(size["height"])
+    # Mode sizes are physical pixels; KWin positions windows in logical ones. A 1920x1200
+    # panel at scale 1.5 is a 1280x800 desktop, and writing the physical numbers into a
+    # window rule puts most of the keyboard off the side of the screen.
+    scale = float(chosen.get("scale") or 1) or 1.0
+    return int(round(int(size["width"]) / scale)), int(round(int(size["height"]) / scale))
 
 
 def main():
