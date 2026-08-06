@@ -22,6 +22,8 @@ OUT="$HOME/.local/share/kwin/scripts/handheld-kbd-opacity/contents/code/main.js"
 OP=""
 HIDE_STEAM=1
 MIRROR=""
+REPORT=0        # 1 while the user is moving the keyboard by hand: report its geometry back
+DOCK_OVERRIDE=""  # force docking off while the user is dragging, whatever the config says
 NAME="Steam Input On-screen Keyboard"
 
 while [ $# -gt 0 ]; do
@@ -29,6 +31,8 @@ while [ $# -gt 0 ]; do
         --opacity)    OP="${2:-}"; shift 2 ;;
         --hide-steam) HIDE_STEAM="${2:-1}"; shift 2 ;;
         --mirror)     MIRROR="${2:-0}"; shift 2 ;;
+        --report)     REPORT="${2:-0}"; shift 2 ;;
+        --dock)       DOCK_OVERRIDE="${2:-}"; shift 2 ;;
         --out)        OUT="${2:-$OUT}"; shift 2 ;;
         --print)      OUT="/dev/stdout"; shift ;;
         *) echo "handheld-kbd-kwin-script: unknown argument '$1'" >&2; exit 2 ;;
@@ -47,27 +51,43 @@ case "$OP" in ''|*[!0-9.]*) OP=0.72 ;; esac
 # area: logical pixels (so display scaling is already accounted for) minus the panels. A
 # 1920x1200 panel at scale 1.5 is a 1280x800 desktop, and the Plasma panel takes a slice
 # off the bottom of that — neither is visible from outside the compositor.
+# PLACE: dock (we compute the bottom strip), custom (the rect the user chose), or none
+# (they are dragging it right now — hands off). ONE authority for placement: this script.
+# KWin window rules are deliberately not used to position the keyboard, because a Force or
+# Remember rule and this script each keep re-asserting their own idea of where the window
+# belongs — which is what made a dragged keyboard snap back a second later.
 DOCK_CFG=$(python3 -c 'import json,os
 try:
     d = json.load(open(os.path.expanduser("~/.config/handheld-kbd/config.json")))
 except Exception:
     d = {}
-dock = 0 if d.get("position_mode", "bottom") == "custom" else 1
+custom = d.get("position_mode", "bottom") == "custom"
+g = d.get("geometry") or {}
 frac = d.get("big_height_frac", 0.55) if d.get("start_big") else d.get("dock_height_frac", 0.42)
 try:
     frac = float(frac)
 except Exception:
     frac = 0.42
-print(f"{dock} {max(0.15, min(frac, 0.95))}")' 2>/dev/null)
-DOCK="${DOCK_CFG%% *}"; FRAC="${DOCK_CFG##* }"
+place = "custom" if (custom and g.get("w") and g.get("h")) else "dock"
+print(place, max(0.15, min(frac, 0.95)),
+      int(g.get("x", 0)), int(g.get("y", 0)), int(g.get("w", 0)), int(g.get("h", 0)))' 2>/dev/null)
+set -- $DOCK_CFG
+PLACE="${1:-dock}"; FRAC="${2:-0.42}"; CX="${3:-0}"; CY="${4:-0}"; CW="${5:-0}"; CH="${6:-0}"
+# An explicit --dock wins: free-move has to turn docking off even though the config still
+# says "bottom", or the keyboard is dragged straight back the moment the user lets go.
+# --dock 0 means the user is dragging: no placement at all until they finish.
+case "$DOCK_OVERRIDE" in 0) PLACE="none" ;; 1) PLACE="dock" ;; esac
 if [ -z "$MIRROR" ]; then
     MIRROR=$(python3 -c 'import json,os
 try: print(0 if json.load(open(os.path.expanduser("~/.config/handheld-kbd/config.json"))).get("mirror", True) is False else 1)
 except Exception: print(1)' 2>/dev/null)
 fi
 case "$MIRROR" in 0|1) : ;; *) MIRROR=1 ;; esac
-case "$DOCK" in 0|1) : ;; *) DOCK=1 ;; esac
+case "$PLACE" in dock|custom|none) : ;; *) PLACE=dock ;; esac
 case "$FRAC" in ''|*[!0-9.]*) FRAC=0.42 ;; esac
+for v in CX CY CW CH; do
+    eval "val=\$$v"; case "$val" in ''|*[!0-9-]*) eval "$v=0" ;; esac
+done
 
 if [ "$HIDE_STEAM" = 1 ]; then
     STEAM_RULE="else if (cap.indexOf(\"$NAME\") !== -1) w.opacity = 0.0;"
@@ -84,8 +104,10 @@ cat > "$OUT" <<EOF
 var OP = $OP;
 var MIRROR = $MIRROR;   // 1 = follow Steam's OSK (the device has no dedicated button)
 var STEAM_OSK = "$NAME";
-var DOCK = $DOCK;      // 1 = we place the keyboard; 0 = a KWin rule holds a custom spot
-var FRAC = $FRAC;      // keyboard height as a fraction of the usable area
+var REPORT = $REPORT;   // 1 = tell the keyboard where it ends up (free-move is on)
+var PLACE = "$PLACE";  // "dock" | "custom" | "none" (the user is moving it by hand)
+var FRAC = $FRAC;      // dock height as a fraction of the usable area
+var CUSTOM = { x: $CX, y: $CY, width: $CW, height: $CH };
 var demoted = {};   // internalId -> true : fullscreen windows WE dropped to keepBelow
 var lastReal = null;   // most recent focusable window the user was on (for focus restore)
 
@@ -143,8 +165,23 @@ function applyStack(){
 // Dock the keyboard along the bottom of the usable area of whichever screen it is on.
 // clientArea(MaximizeArea) is in logical pixels and already excludes panels, so this is
 // right at any resolution, any scale factor, and with a panel of any size on any edge.
+var placing = false;   // re-entry guard: we resize the window inside its own signal
+var placedCustom = {};  // a custom spot is applied once per window, never re-asserted
 function dockKbd(w){
-    if (!DOCK || !isKbd(w)) return;
+    if (PLACE === "none" || !isKbd(w) || placing) return;
+    placing = true;
+    if (PLACE === "custom") {
+        if (placedCustom["" + w.internalId]) { placing = false; return; }
+        placedCustom["" + w.internalId] = true;
+        try {
+            var cg = w.frameGeometry;
+            cg.x = CUSTOM.x; cg.y = CUSTOM.y;
+            cg.width = CUSTOM.width; cg.height = CUSTOM.height;
+            w.frameGeometry = cg;
+        } catch(e){}
+        placing = false;
+        return;
+    }
     try {
         var area = workspace.clientArea(KWin.MaximizeArea, w);
         var h = Math.max(120, Math.round(area.height * FRAC));
@@ -161,6 +198,7 @@ function dockKbd(w){
             w.frameGeometry = got;
         }
     } catch(e){}
+    placing = false;
 }
 
 function isSteamOsk(w){ return ("" + w.caption).indexOf(STEAM_OSK) !== -1; }
@@ -177,6 +215,34 @@ function callKbd(method){
 
 function watch(w){
     try { w.fullScreenChanged.connect(applyStack); w.minimizedChanged.connect(applyStack); } catch(e){}
+    if (REPORT && isKbd(w)) watchGeometry(w);
+    // Keep it pinned: GTK can settle on a different height slightly after we place it
+    // (the suggestion row, a font metric), which would otherwise leave the keyboard
+    // floating short of the bottom edge until something else moved it.
+    // Only the dock re-asserts itself. A custom spot is placed once and then left alone,
+    // so the keyboard behaves like a normal window you happened to put there.
+    if (PLACE === "dock" && isKbd(w)) {
+        try { w.frameGeometryChanged.connect(function(){ dockKbd(w); }); } catch(e){}
+    }
+}
+
+// While the user is dragging the keyboard, tell it where it actually is. A Wayland client
+// cannot ask, and a KWin "Remember" rule is not written back to kwinrulesrc until the
+// window closes — reading that file mid-session returns the previous forced rect, which is
+// why finishing a move used to snap the keyboard back to where it started.
+function reportGeometry(w){
+    try {
+        var g = w.frameGeometry;
+        callDBus("org.handheld.Keyboard", "/org/handheld/Keyboard",
+                 "org.handheld.Keyboard", "SetGeometry",
+                 "" + g.x + "," + g.y + "," + g.width + "," + g.height);
+    } catch(e){}
+}
+
+function watchGeometry(w){
+    try { w.frameGeometryChanged.connect(function(){ reportGeometry(w); }); } catch(e){}
+    try { w.interactiveMoveResizeFinished.connect(function(){ reportGeometry(w); }); } catch(e){}
+    reportGeometry(w);
 }
 function onAdded(w){
     setOp(w); watch(w); dockKbd(w); applyStack();

@@ -15,3 +15,6 @@ unigrams.txt
 bigrams.txt
 learned.json
 raw/
+
+# bundled at release time by the workflow, never committed
+vendor/

@@ -59,9 +59,52 @@ def _atomic_write(path, text):
         raise
 
 
+def _load_profanity_filter():
+    """Optional: keep the suggestion row from proposing slurs and porn vocabulary.
+
+    Suggestions appear unbidden in whatever you are typing into, and a web-scraped
+    frequency list contains plenty you would not want offered. The wordlist belongs to a
+    library, not to this project — install one and it is used automatically:
+
+        pip install --user better-profanity
+
+    Without it, nothing is filtered and typing is unaffected either way; this never blocks
+    you from typing a word, it only decides what gets *offered*.
+    """
+    import os
+    import sys
+    # where handheld-kbd-install-filter (or the installer, from the release bundle) puts it
+    local = os.path.expanduser("~/.local/lib/handheld-kbd")
+    if os.path.isdir(local) and local not in sys.path:
+        sys.path.insert(0, local)
+    try:
+        from better_profanity import profanity
+    except Exception:
+        return None
+    try:
+        profanity.load_censor_words()
+    except Exception:
+        return None
+    return lambda w: profanity.contains_profanity(w)
+
+
+_is_profane = _load_profanity_filter()
+
+
+def _safe_drop(fn, word):
+    try:
+        return bool(fn(word))
+    except Exception:
+        return False
+
+
 class Predictor:
-    def __init__(self, data_dir=DATA_DIR, neighbours=None, max_words=0):
+    def __init__(self, data_dir=DATA_DIR, neighbours=None, max_words=0,
+                 filter_profanity=True):
         self.dir = data_dir
+        # Only governs what the suggestion row offers; typing is never restricted. Needs an
+        # installed profanity library (see _load_profanity_filter) or it is a no-op.
+        self.filter_profanity = filter_profanity
         self.words = []          # sorted, lowercase
         self.counts = []         # parallel to words
         self.uni = {}            # word -> count
@@ -257,6 +300,7 @@ class Predictor:
         prefix = (prefix or "").lower()
         prev = (prev or "").lower() or None
         scored = {}
+        drop = _is_profane if (_is_profane and self.filter_profanity) else None
 
         if not prefix:
             # Pure next-word prediction: everything the corpus/personal bigrams
@@ -266,6 +310,8 @@ class Predictor:
             pool = set()
             pool.update((self.bi.get(prev) or {}).keys())
             pool.update((self.pbi.get(prev) or {}).keys())
+            if drop is not None:
+                pool = {w for w in pool if not _safe_drop(drop, w)}
             for w in pool:
                 p = self._p(w, prev)
                 if p > 0:
@@ -306,8 +352,19 @@ class Predictor:
             if lit > scored.get(prefix, 0.0):
                 scored[prefix] = lit
 
-        best = sorted(scored.items(), key=lambda kv: -kv[1])[:n]
-        return [w for w, _ in best]
+        ranked = sorted(scored.items(), key=lambda kv: -kv[1])
+        out = []
+        for w, _ in ranked:
+            if drop is not None:
+                try:
+                    if drop(w):
+                        continue
+                except Exception:
+                    pass
+            out.append(w)
+            if len(out) >= n:
+                break
+        return out
 
 
 # ---- neighbour map helper -------------------------------------------------

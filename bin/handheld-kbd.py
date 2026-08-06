@@ -251,6 +251,7 @@ class OSK(Gtk.Window):
         self.size_btn = None
         self.opacity_btn = None
         self.move_btn = None
+        self.reported_rect = None      # where KWin last said our window is (free-move)
         self.hide_cb = None            # set by main(); keeps the hide path single-sourced
         self.big = bool(config.get("start_big", False))
         # Unlocked = KWin's rule is on Remember, so the user can drag/resize by hand.
@@ -394,8 +395,22 @@ class OSK(Gtk.Window):
             from handheld_kbd_predict import Predictor, neighbours_from_rows
             self.pred = Predictor(neighbours=neighbours_from_rows(rows))
             if not self.pred.ready:
-                print("handheld-kbd: no prediction data — run handheld-kbd-build-dict",
+                # Self-heal an install that never built its dictionary (an upgrade, or an
+                # installer run before this was automatic). Once, in the background.
+                print("handheld-kbd: no prediction data — building it now",
                       file=sys.stderr)
+                stamp = os.path.expanduser("~/.local/share/handheld-kbd/.build-started")
+                builder = os.path.expanduser("~/.local/bin/handheld-kbd-build-dict")
+                if os.access(builder, os.X_OK) and not os.path.exists(stamp):
+                    try:
+                        os.makedirs(os.path.dirname(stamp), exist_ok=True)
+                        open(stamp, "w").close()
+                        subprocess.Popen([builder],
+                                         stdout=open("/tmp/handheld-kbd-build-dict.log", "w"),
+                                         stderr=subprocess.STDOUT, start_new_session=True)
+                    except Exception as ex:
+                        print(f"handheld-kbd: could not start the builder ({ex})",
+                              file=sys.stderr)
         except Exception as ex:
             print(f"handheld-kbd: prediction disabled ({ex})", file=sys.stderr)
             self.pred = None
@@ -859,13 +874,11 @@ class OSK(Gtk.Window):
         self.move(rect["x"], rect["y"])
         if self.unlocked:                    # the user is placing it by hand
             return
-        if self.cfg.get("position_mode", "bottom") == "custom":
-            self._apply_kwin_geometry(rect)  # pin the spot they locked
-        else:
-            # Docked: KWin's script does the placing, because only KWin knows the work
-            # area (logical pixels, panels excluded). Stop the rule fighting it.
-            self._set_rule_mode(1)           # DontAffect
-            self._reload_kwin_script()
+        # The KWin script is the only thing that positions the window — in both docked and
+        # custom modes. A window rule doing it too meant two authorities re-asserting
+        # different rects, which is why a dragged keyboard jumped back a second later.
+        self._set_rule_mode(1)               # DontAffect: rules never place us
+        self._reload_kwin_script()
 
     def _is_internal(self, name):
         want = (self.cfg.get("internal_output", "") or "").lower()
@@ -953,7 +966,42 @@ class OSK(Gtk.Window):
             print(f"handheld-kbd: rule mode {mode} failed ({ex})", file=sys.stderr)
             return False
 
-    def _reload_kwin_script(self):
+    def request_geometry(self):
+        """Ask KWin, right now, where our window is.
+
+        Relying on frameGeometryChanged alone is not enough: after a real interactive drag
+        the signal may not have been delivered by the time the user taps ✓, and then we
+        would fall back to reading kwinrulesrc — which still holds the OLD forced rect, so
+        the keyboard appears to jump home. This pushes the answer to us instead."""
+        js = "/tmp/handheld-kbd-report.js"
+        try:
+            with open(js, "w") as f:
+                f.write(
+                    'workspace.windowList().forEach(function(w){\n'
+                    '  if (("" + w.resourceClass).indexOf("handheld-kbd") !== -1) {\n'
+                    '    var g = w.frameGeometry;\n'
+                    '    callDBus("org.handheld.Keyboard", "/org/handheld/Keyboard",\n'
+                    '             "org.handheld.Keyboard", "SetGeometry",\n'
+                    '             "" + g.x + "," + g.y + "," + g.width + "," + g.height);\n'
+                    '  }\n});\n')
+            S = "org.kde.kwin.Scripting."
+            name = "handheld-kbd-report"
+            for args in (["unloadScript", name], ["loadScript", js, name], ["start"]):
+                subprocess.run(["qdbus6", "org.kde.KWin", "/Scripting", S + args[0]] + args[1:],
+                               check=False, timeout=3)
+        except Exception as ex:
+            print(f"handheld-kbd: geometry request failed ({ex})", file=sys.stderr)
+
+    def set_reported_geometry(self, rect):
+        """KWin telling us where our window actually is, as "x,y,w,h" (logical pixels)."""
+        try:
+            x, y, w, h = (int(v) for v in rect.split(","))
+        except Exception:
+            return
+        if w >= 160 and h >= 80:
+            self.reported_rect = {"x": x, "y": y, "w": w, "h": h}
+
+    def _reload_kwin_script(self, report=False):
         """Regenerate the KWin script and reload it. The script reads the dock settings out
         of config.json, so this is how a mode/size change reaches the compositor."""
         writer = os.path.expanduser("~/.local/bin/handheld-kbd-kwin-script")
@@ -962,7 +1010,10 @@ class OSK(Gtk.Window):
         if not os.access(writer, os.X_OK):
             return
         try:
-            subprocess.run([writer, "--out", opscript], check=False, timeout=5)
+            args = [writer, "--out", opscript, "--report", "1" if report else "0"]
+            if report:
+                args += ["--dock", "0"]   # hands off while the user is placing it
+            subprocess.run(args, check=False, timeout=5)
             S = "org.kde.kwin.Scripting."
             for args in (["unloadScript", "handheld-kbd-opacity"],
                          ["loadScript", opscript, "handheld-kbd-opacity"],
@@ -1002,40 +1053,45 @@ class OSK(Gtk.Window):
             return
         self.unlocked = not self.unlocked
         if self.unlocked:
-            self._set_rule_mode(4)              # Remember: KWin lets it be moved/resized
+            self.reported_rect = None
+            self._set_rule_mode(1)              # DontAffect: nothing pins it while dragging
+            self._reload_kwin_script(report=True)   # script stops placing, starts reporting
         else:
-            # Leaving free-move never moves the window. Read back where it ended up, hold
-            # it there, and remember it as the custom position.
-            g = self._read_rule_geometry()
-            if g:
-                outs = self._outputs()
-                anchor = next((o for o in outs if o["internal"]), outs[0] if outs else None)
-                g = self._clamp_rect(g, anchor)
-                ox, oy = self._panel_origin()   # geometry is stored panel-relative
-                self.cfg["geometry"] = {"x": g["x"] - ox, "y": g["y"] - oy,
-                                        "w": g["w"], "h": g["h"]}
-                self.cfg["position_mode"] = "custom"
-                self._persist("geometry", self.cfg["geometry"])
-                self._persist("position_mode", "custom")
-                self._last_rect = None          # so the re-force definitely writes
-                self._set_rule_mode(2)          # Force — pins it where it already is
-                self._apply_kwin_geometry(g)
-            else:
-                # Couldn't read it back: still lock, but leave the window alone rather
-                # than yanking it somewhere the user didn't choose.
-                print("handheld-kbd: could not read back the dragged position; "
-                      "leaving the window where it is", file=sys.stderr)
-                self._set_rule_mode(2)
+            # Leaving free-move must never move the window. Ask KWin where it is, give the
+            # reply a moment to land (the main loop has to stay free to receive it), then
+            # pin it exactly there.
+            self.request_geometry()
+            GLib.timeout_add(250, self._finish_move)
         self._apply_handle()
+
+    def _finish_move(self):
+        g = self.reported_rect
+        if not g:
+            # No answer: freeze by doing nothing. Forcing the rect from kwinrulesrc here is
+            # what used to yank the keyboard back to the dock, because that file still holds
+            # the old forced position until the window closes.
+            print("handheld-kbd: no geometry from KWin; leaving the keyboard where it is",
+                  file=sys.stderr)
+            self._reload_kwin_script(report=False)
+            return False
+        # Stored exactly as KWin reports it, in absolute compositor coordinates, with no
+        # clamping: a keyboard you moved by hand should stay where you put it, including
+        # half off the edge, like any other window. ⤓ is the way back to the dock.
+        self.cfg["geometry"] = dict(g)
+        self.cfg["position_mode"] = "custom"
+        # Persist BEFORE regenerating: the script reads both to decide where to hold the
+        # window, and would otherwise reload still thinking it should dock.
+        self._persist("geometry", self.cfg["geometry"])
+        self._persist("position_mode", "custom")
+        self._reload_kwin_script(report=False)
+        self._placed_key = None
+        return False
 
     def on_reset(self, btn):
         """Reset: back to the default bottom dock, forgetting wherever it was moved to."""
         if self._stray_tap():
             return
-        was_free = self.unlocked
         self.unlocked = False
-        if was_free:
-            self._set_rule_mode(2)           # stop KWin remembering the dragged spot
         self.cfg["position_mode"] = "bottom"
         self._persist("position_mode", "bottom")
         self._last_rect = None
@@ -1072,7 +1128,7 @@ class OSK(Gtk.Window):
             return ev
 
         drag = Gtk.EventBox()
-        drag.add(Gtk.Label(label="drag to move  ·  ✓ when done"))
+        drag.add(Gtk.Label(label="drag to move  ·  ✓ when done  ·  ⤓ reset position"))
         drag.get_style_context().add_class("handle-drag")
         drag.connect("button-press-event", self._on_drag_press)
         bar.pack_start(grip(Gdk.WindowEdge.NORTH_WEST, "⤡"), False, False, 0)
@@ -1129,12 +1185,10 @@ class OSK(Gtk.Window):
         anchor = next((o for o in outs if o["internal"]), outs[0] if outs else None)
         if self.cfg.get("position_mode", "bottom") != "custom" or not g:
             if anchor:
-                return self._dock_rect(anchor, big)
-            # no display info: fall back to the configured rect as-is
-            g = g or dict(DEFAULT_CONFIG["geometry"])
-        ox, oy = self._panel_origin()
-        return self._clamp_rect(
-            {"x": g["x"] + ox, "y": g["y"] + oy, "w": g["w"], "h": g["h"]}, anchor)
+                return self._dock_rect(anchor, big)   # the dock IS clamped: it is ours to place
+            return dict(g or DEFAULT_CONFIG["geometry"])
+        # Custom: the user placed it. Hand it back untouched — no clamping, no anchoring.
+        return {"x": g["x"], "y": g["y"], "w": g["w"], "h": g["h"]}
 
     def _apply_kwin_geometry(self, g):
         """Rewrite our KWin window-rule's forced position/size so it follows the toggle
@@ -1267,6 +1321,11 @@ SERVICE_XML = """
     <method name='Show'/>
     <method name='Hide'/>
     <method name='Toggle'/>
+    <method name='FreeMove'/>
+    <method name='Reset'/>
+    <method name='SetGeometry'>
+      <arg type='s' name='rect' direction='in'/>
+    </method>
   </interface>
 </node>
 """
@@ -1274,7 +1333,7 @@ SERVICE_XML = """
 _service_keepalive = []
 
 
-def setup_service(show, hide, toggle):
+def setup_service(show, hide, toggle, set_geometry=None, free_move=None, reset=None):
     """Expose Show/Hide/Toggle on the session bus.
 
     This is what replaced polling. The KWin script calls these the moment Steam's
@@ -1282,15 +1341,19 @@ def setup_service(show, hide, toggle):
     tree ten times a second to notice — that poll was both the latency in summoning the
     keyboard and a constant drip of xwininfo/xprop processes."""
     from gi.repository import Gio
-    handlers = {"Show": show, "Hide": hide, "Toggle": toggle}
+    handlers = {"Show": show, "Hide": hide, "Toggle": toggle,
+                "FreeMove": free_move, "Reset": reset}
 
     def on_call(conn, sender, path, iface, method, params, invocation):
-        fn = handlers.get(method)
-        if fn is not None:
-            try:
-                fn()
-            except Exception as ex:
-                print(f"handheld-kbd: {method} failed ({ex})", file=sys.stderr)
+        try:
+            if method == "SetGeometry" and set_geometry is not None:
+                set_geometry(params.unpack()[0])
+            else:
+                fn = handlers.get(method)
+                if fn is not None:
+                    fn()
+        except Exception as ex:
+            print(f"handheld-kbd: {method} failed ({ex})", file=sys.stderr)
         invocation.return_value(None)
 
     def on_acquired(conn, name, _user=None):   # GLib calls this with 2 args
@@ -1648,12 +1711,19 @@ def main():
         if not state["shown"]:            # show-only, idempotent (no auto-hide)
             _show()
 
-    setup_service(_show, _hide, _toggle)  # DBus service: how KWin tells us Steam's OSK moved
+    # KWin talks to us here; FreeMove/Reset are the same actions as the ✥ and ⤓ keys, so
+    # they can be scripted or bound to a shortcut.
+    setup_service(_show, _hide, _toggle, w.set_reported_geometry,
+                  lambda: w.on_move(None), lambda: w.on_reset(None))
     setup_dbus_trigger(config, _toggle)   # seamless hardware-button trigger (InputPlumber)
     setup_hotkey(config, _toggle)         # optional evdev hotkey (attached kbd / Steam Input chord)
     setup_focus_trigger(config, _focus_show)  # optional: auto-show when a text field is focused
     setup_gesture(config, _focus_show)        # optional: swipe up from bottom edge to summon
 
+    # Do the placement work up front so even the FIRST summon is instant: it involves a
+    # config write, a KWin reconfigure and a script reload, which is ~300ms the user should
+    # never wait for.
+    GLib.idle_add(lambda: (w.ensure_placed(), False)[1])
     _setvis("1" if os.environ.get("HANDHELD_KBD_SHOW") == "1" else "0")
     if os.environ.get("HANDHELD_KBD_SHOW") == "1":
         _show()

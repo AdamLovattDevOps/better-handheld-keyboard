@@ -40,6 +40,8 @@ install -m755 "$HERE/bin/handheld-kbd-relogin"   "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-ip-remap"  "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-recover"   "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-dock-rect" "$BIN/"
+install -m755 "$HERE/bin/handheld-kbd-install-filter" "$BIN/"
+install -m755 "$HERE/bin/handheld-kbd-toggle" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-build-dict" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-focus-probe" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-resume.sh"  "$BIN/"
@@ -257,8 +259,35 @@ echo "   • Log out and back in once (activates autostart + permissions)."
 echo "   • Then press your device's keyboard button — this keyboard comes up instead."
 echo "   • Edit ~/.config/handheld-kbd/config.json for opacity, layout, theme, optional hotkey."
 echo "   • No keyboard at all afterwards? Run:  handheld-kbd-recover"
+echo "   • Summon it without Steam (bind this to a shortcut):  handheld-kbd-toggle"
+# --- prediction data: build it, don't just tell the user it exists ---
+# Without this the suggestion row has nothing to draw on, which reads as "predictive text
+# doesn't work". aspell is present on SteamOS, so the offline path works; it takes a minute
+# or two, hence the background run.
+if [ ! -s "$HOME/.local/share/handheld-kbd/unigrams.txt" ]; then
+  say "Building the prediction dictionary in the background (a minute or two)…"
+  setsid "$BIN/handheld-kbd-build-dict" >/tmp/handheld-kbd-build-dict.log 2>&1 &
+else
+  say "Prediction dictionary already present."
+fi
+
+# --- optional suggestion filter -------------------------------------------------------
+# Shipped inside the release archive (the release workflow fetches the published package),
+# so an offline install still gets filtered suggestions. Falls back to fetching it here.
+FILTER_DIR="$HOME/.local/lib/handheld-kbd"
+if [ -d "$HERE/vendor" ] && [ -n "$(ls -A "$HERE/vendor" 2>/dev/null)" ]; then
+  mkdir -p "$FILTER_DIR"
+  cp -a "$HERE/vendor/." "$FILTER_DIR/"
+  say "Suggestion filter installed (bundled)."
+elif "$BIN/handheld-kbd-install-filter" --check 2>/dev/null | grep -q installed; then
+  say "Suggestion filter already present."
+else
+  say "Fetching the optional suggestion filter…"
+  "$BIN/handheld-kbd-install-filter" >/dev/null 2>&1 \
+    && say "Suggestion filter installed." \
+    || warn "No suggestion filter — suggestions will be unfiltered."
+fi
+
 echo
-say "Predictive text works from what you type straight away. For corpus-backed"
-say "suggestions from the first keypress, build the dictionary once:"
-echo "     handheld-kbd-build-dict"
+say "Rebuild the prediction dictionary any time with: handheld-kbd-build-dict"
 [ "${PRIV_OK:-0}" = 1 ] || warn "Permission step didn't complete — typing won't work until it does."

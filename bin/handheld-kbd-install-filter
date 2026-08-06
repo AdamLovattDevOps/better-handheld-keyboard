@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""Fetch the optional suggestion filter (better-profanity) from PyPI.
+
+Suggestions appear unbidden above the keys, and a web-frequency corpus contains plenty you
+would not want offered to you unprompted. Deciding which words those are is a job for a
+maintained library, not for this project — so nothing of that kind is stored here; this
+downloads the published package and unpacks it beside the keyboard:
+
+    ~/.local/lib/handheld-kbd/
+
+SteamOS has no pip (immutable image, no ensurepip), which is why this exists rather than a
+line in a requirements file. Filtering is optional: without the package the keyboard runs
+exactly as before, and either way this only affects what is *suggested* — you can always
+type whatever you like.
+
+    handheld-kbd-install-filter                 install or update it
+    handheld-kbd-install-filter --check         report whether it is present
+    handheld-kbd-install-filter --target DIR    unpack somewhere else (the release
+                                                workflow uses this to bundle it, so
+                                                offline installs get filtering too)
+"""
+import io
+import json
+import os
+import sys
+import urllib.request
+import zipfile
+
+PKG = "better-profanity"
+TARGET = os.path.expanduser("~/.local/lib/handheld-kbd")
+
+
+def present():
+    import importlib
+    importlib.invalidate_caches()   # the dir may have just appeared; the finder caches misses
+    if TARGET not in sys.path:
+        sys.path.insert(0, TARGET)
+    try:
+        import better_profanity  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+def wheel_url():
+    with urllib.request.urlopen(f"https://pypi.org/pypi/{PKG}/json", timeout=20) as r:
+        data = json.load(r)
+    for entry in data.get("urls", []):
+        if entry.get("packagetype") == "bdist_wheel" and entry.get("filename", "").endswith(
+                ("py3-none-any.whl", "py2.py3-none-any.whl")):
+            return entry["url"]
+    raise RuntimeError("no pure-python wheel published")
+
+
+def main():
+    global TARGET
+    if "--target" in sys.argv:
+        TARGET = os.path.abspath(sys.argv[sys.argv.index("--target") + 1])
+    if "--check" in sys.argv:
+        print("installed" if present() else "not installed")
+        return 0
+    if present():
+        print(f"{PKG} already available in {TARGET}")
+        return 0
+    try:
+        url = wheel_url()
+        print(f"fetching {url.rsplit('/', 1)[-1]}")
+        with urllib.request.urlopen(url, timeout=60) as r:
+            blob = r.read()
+        os.makedirs(TARGET, exist_ok=True)
+        with zipfile.ZipFile(io.BytesIO(blob)) as z:
+            z.extractall(TARGET)
+    except Exception as ex:
+        print(f"could not install {PKG}: {ex}", file=sys.stderr)
+        print("suggestions will simply be unfiltered", file=sys.stderr)
+        return 1
+    if not present():
+        print(f"{PKG} unpacked but not importable", file=sys.stderr)
+        return 1
+    print(f"{PKG} installed into {TARGET} — suggestions will be filtered")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

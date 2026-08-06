@@ -9,7 +9,41 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
-## v1.0.8 — Event-driven, and free move instead of lock
+## v1.0.8 — Event-driven, free movement, and prediction that works out of the box
+
+### Changed
+
+- **Free move, not lock.** ✥ turns free movement on — a drag bar appears, drag it anywhere,
+  grab either end to resize — and ✓ finishes, leaving the keyboard exactly where you put
+  it, including half off the edge of the screen if that is what you want. It behaves like
+  an ordinary window while you are placing it. ⤓ puts it back to the bottom dock.
+- **One thing places the keyboard.** A KWin window rule and the KWin script were both
+  asserting a position, and the rule won about a second later — which is why a keyboard you
+  had just dragged snapped back. Rules are now `DontAffect` permanently and the script is
+  the sole authority: it computes the dock (logical pixels, panels excluded) or applies
+  your custom spot once and then leaves the window alone.
+- Custom positions are stored exactly as the compositor reports them, with no clamping.
+  Only the dock is clamped, because that one is ours to compute.
+
+### Added
+
+- **`handheld-kbd-toggle`** — show/hide without going through Steam. Mirror mode summons the
+  keyboard by watching Steam's on-screen keyboard, so if Steam dies you have no keyboard,
+  which is a poor place to be when you need to type a command to fix Steam. Bind it to a KDE
+  shortcut, or use the `Toggle Keyboard.desktop` launcher.
+- **A DBus service** (`org.handheld.Keyboard`): `Show`, `Hide`, `Toggle`, `FreeMove`,
+  `Reset`, `SetGeometry`. This is how the compositor drives the keyboard, and it makes every
+  action scriptable.
+- **Prediction data builds itself.** The installer built nothing and only printed a hint, so
+  a fresh install had an empty dictionary and prediction appeared not to work at all. It is
+  now built in the background at install time, and the keyboard self-heals on startup if the
+  data is missing.
+- **Optional profanity filtering of suggestions.** Suggestions come from a web-frequency
+  corpus and appear unbidden above the keys. Deciding which words to withhold is a job for a
+  maintained library, so `handheld-kbd-install-filter` fetches `better-profanity` (no pip on
+  SteamOS) and the release archive bundles it, so offline installs get it too. It governs
+  only what is *offered* — you can always type anything. Measured on a Legion Go 2: 403 of
+  80,000 corpus words are withheld.
 
 ### Fixed
 
@@ -33,11 +67,21 @@ The heading must be `## v<version> — <title>` and the version must match the t
 - The keyboard's own output is no longer thrown away when the daemon respawns it; it goes
   to `/tmp/handheld-kbd-out.log`, which is where a startup failure would show up.
 
-### Changed
+### Known issue: Steam Deck stick-mouse
 
-- **Free move, not lock.** ✥ turns free movement on (drag bar appears, KWin lets the window
-  be moved and resized) and off again (it stays exactly where you left it). The key shows
-  ✓ while free movement is on. ⤓ is unchanged: back to the default bottom dock.
+On a Steam Deck, a single keystroke from *any* virtual keyboard stops Steam Input's
+stick-mouse working, while the trackpad (absolute pointer motion) keeps working. It is not
+specific to this keyboard: it reproduces with a bare `uinput` device emitting one key, with
+no window and no KWin script, and the device's identity (bus type, vendor, product) makes no
+difference. Nothing changes at the device layer — same devices, handlers and grabs before
+and after. Recovery, without a reboot:
+
+```bash
+steam -shutdown && sleep 5 && steam -silent &
+```
+
+`handheld-kbd-toggle` exists partly for this: it summons the keyboard even when Steam is
+down.
 
 ## v1.0.7 — Correct at any resolution and any scale
 

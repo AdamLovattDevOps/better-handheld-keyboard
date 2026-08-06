@@ -43,7 +43,10 @@ So I built the keyboard I wanted instead. Here's what it does differently:
   Legion Go 2 all get the same keyboard in the same spot.
 - **Or put it where you want it.** ✥ turns on free movement: a bar appears along
   the top, drag it anywhere, grab either end to resize, then press ✓ to finish —
-  it stays where you left it. ⤓ puts it back to the bottom dock.
+  it stays exactly where you left it, like any other window. ⤓ resets it to the
+  bottom dock.
+- **It doesn't need Steam.** `handheld-kbd-toggle` shows and hides it directly, so
+  a dead Steam client can't leave you without a keyboard. Bind it to a shortcut.
 - **Swipe typing.** Drag across the letters instead of tapping them. Taps are
   unaffected — a drag only counts once it's unmistakably not one.
 - **Optional summon gestures.** Two-finger swipe up from the bottom edge
