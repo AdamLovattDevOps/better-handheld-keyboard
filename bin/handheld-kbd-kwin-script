@@ -77,6 +77,12 @@ PLACE="${1:-dock}"; FRAC="${2:-0.42}"; CX="${3:-0}"; CY="${4:-0}"; CW="${5:-0}";
 # says "bottom", or the keyboard is dragged straight back the moment the user lets go.
 # --dock 0 means the user is dragging: no placement at all until they finish.
 case "$DOCK_OVERRIDE" in 0) PLACE="none" ;; 1) PLACE="dock" ;; esac
+# A runtime fallback beats the config: the daemon sets this when the hardware-button remap
+# could not be applied, and without honouring it here every regeneration of this script
+# would turn mirroring back off while the button is still dead.
+if [ -z "$MIRROR" ] && [ -f /tmp/handheld-kbd.mirror-fallback ]; then
+    MIRROR=1
+fi
 if [ -z "$MIRROR" ]; then
     MIRROR=$(python3 -c 'import json,os
 try: print(0 if json.load(open(os.path.expanduser("~/.config/handheld-kbd/config.json"))).get("mirror", True) is False else 1)
