@@ -36,11 +36,24 @@ jobs:
           fi
           echo "RELEASE_TITLE=$title" >> "$GITHUB_ENV"
 
+      - name: Bundle the optional suggestion filter
+        # Fetched here rather than committed: the package (and its wordlist) belongs to its
+        # upstream, not to this repo. Bundling it means an offline install — a handheld with
+        # no pip, which is all of them — still gets filtered suggestions.
+        run: |
+          set -euo pipefail
+          python3 bin/handheld-kbd-install-filter --target vendor || {
+            echo "::warning::suggestion filter not bundled; installs will fetch or go without"
+            rm -rf vendor
+          }
+          [ -d vendor ] && du -sh vendor || true
+
       - name: Package the tree
         run: |
           set -euo pipefail
           name="better-handheld-keyboard-${GITHUB_REF_NAME}"
           mkdir -p "dist/$name"
+          # vendor/ IS included: it is the bundled filter, gitignored but wanted in the archive
           rsync -a --exclude .git --exclude .github --exclude dist --exclude notes.md ./ "dist/$name/"
           tar -C dist -czf "dist/$name.tar.gz" "$name"
           (cd dist && zip -qr "$name.zip" "$name")

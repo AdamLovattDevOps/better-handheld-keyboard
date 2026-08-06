@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Toggle Handheld Keyboard
+Comment=Show or hide the keyboard without going through Steam
+Icon=input-keyboard
+Terminal=false
+Exec=sh -c '"$HOME/.local/bin/handheld-kbd-toggle"'
+Categories=Utility;

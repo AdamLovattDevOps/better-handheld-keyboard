@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Show/hide the keyboard without going through Steam.
+#
+# Mirror mode summons the keyboard by watching for Steam's on-screen keyboard, which means
+# no Steam, no keyboard — a bad place to be when you need to type a command to fix Steam.
+# This talks to the keyboard directly, so it works regardless. Bind it to a KDE shortcut,
+# put it on the desktop, or run it over SSH.
+#
+#   handheld-kbd-toggle          show if hidden, hide if shown
+#   handheld-kbd-toggle show     always show
+#   handheld-kbd-toggle hide     always hide
+set -u
+case "${1:-toggle}" in
+    show)   METHOD=Show ;;
+    hide)   METHOD=Hide ;;
+    toggle) METHOD=Toggle ;;
+    *) echo "usage: handheld-kbd-toggle [show|hide|toggle]" >&2; exit 2 ;;
+esac
+
+# The keyboard may not be running yet (first use after login, or it was killed).
+if ! pgrep -f 'handheld-kbd[.]py' >/dev/null 2>&1; then
+    setsid python3 "$HOME/.local/bin/handheld-kbd.py" >>/tmp/handheld-kbd-out.log 2>&1 &
+    for _ in $(seq 20); do
+        pgrep -f 'handheld-kbd[.]py' >/dev/null 2>&1 && break
+        sleep 0.25
+    done
+    sleep 0.5
+fi
+
+busctl --user call org.handheld.Keyboard /org/handheld/Keyboard \
+    org.handheld.Keyboard "$METHOD" >/dev/null 2>&1 \
+    || { echo "keyboard did not answer on DBus" >&2; exit 1; }
