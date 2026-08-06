@@ -61,14 +61,19 @@ try:
     d = json.load(open(os.path.expanduser("~/.config/handheld-kbd/config.json")))
 except Exception:
     d = {}
-custom = d.get("position_mode", "bottom") == "custom"
 g = d.get("geometry") or {}
 frac = d.get("big_height_frac", 0.55) if d.get("start_big") else d.get("dock_height_frac", 0.42)
 try:
     frac = float(frac)
 except Exception:
     frac = 0.42
-place = "custom" if (custom and g.get("w") and g.get("h")) else "dock"
+mode = d.get("position_mode", "bottom")
+if mode == "free":
+    place = "none"          # the user placed it and we could not read the rect: hands off
+elif mode == "custom" and g.get("w") and g.get("h"):
+    place = "custom"
+else:
+    place = "dock"
 print(place, max(0.15, min(frac, 0.95)),
       int(g.get("x", 0)), int(g.get("y", 0)), int(g.get("w", 0)), int(g.get("h", 0)))' 2>/dev/null)
 set -- $DOCK_CFG
@@ -260,7 +265,9 @@ function watchGeometry(w){
         } catch(e){}
     }
     print("HHKBD watching geometry via " + connected + " signal(s)");
-    reportGeometry(w);
+    // Deliberately NOT reporting here. Seeding the current rect means that if the drag
+    // emits no signal we still hold a value — the pre-drag dock position — and finishing
+    // the move would "save" that and snap the keyboard back to the dock.
 }
 function onAdded(w){
     setOp(w); watch(w); dockKbd(w); applyStack();
@@ -276,7 +283,13 @@ function onAdded(w){
 }
 
 workspace.windowActivated.connect(function(w){ if (focusable(w)) lastReal = w; });
-workspace.windowList().forEach(function(w){ setOp(w); watch(w); dockKbd(w); });
+workspace.windowList().forEach(function(w){
+    setOp(w); watch(w);
+    // Existing windows: in custom placement, mark as already placed so a script reload
+    // leaves them untouched. Docking still re-asserts, because that is ours to compute.
+    if (PLACE === "custom") placedCustom[""+w.internalId] = true;
+    dockKbd(w);
+});
 workspace.windowAdded.connect(onAdded);
 workspace.windowRemoved.connect(function(w){
     applyStack();

@@ -9,7 +9,7 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
-## v1.0.9-rc1 — The tick actually holds the position
+## v1.0.9 — The tick actually holds the position
 
 ### Fixed
 
@@ -28,6 +28,21 @@ The heading must be `## v<version> — <title>` and the version must match the t
 - **The free-move indicator is much quieter.** The bar appearing is signal enough; the blue
   fill on the key and the accent stripe on the bar were shouting about it. Muted bar, muted
   grips, and the key takes a thin outline instead of a solid block.
+
+- **No stale position is ever saved.** Starting free movement used to report the window's
+  rect immediately, which is the *dock* position. If the drag then emitted none of the
+  connected signals that stale value survived, and ✓ saved it — putting the keyboard back on
+  the dock. Nothing is seeded now, and finishing clears the value before asking, so it can
+  only ever finish on a rect from after the drag.
+- **Reloading the KWin script no longer moves the keyboard.** A custom position is applied
+  only to a window the script has not seen before, i.e. one that was just created. That is
+  how a window manager treats a window you placed yourself: the compositor holds it, and the
+  saved rect exists to restore it next time rather than to re-assert it while it is up.
+- **A move never falls back to docking.** When the geometry reply arrived too slowly we gave
+  up and left the config in dock mode — and docking re-asserts itself on the next geometry
+  change, so the keyboard snapped back a moment later. That is what made the reset
+  intermittent. There is now a third mode, `free`: nothing places the window at all, so where
+  you left it is where it stays even if the readback fails. ⤓ still returns it to the dock.
 
 Verified on a Legion Go 2: moved to an arbitrary 220,140 (not snapped to an edge), held
 through the tick, still there three seconds later and after a hide/show cycle, saved as
