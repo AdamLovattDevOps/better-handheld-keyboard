@@ -9,6 +9,36 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.0.6 — Same place on every device
+
+### Changed
+
+- **Docked to the bottom, identically everywhere.** The default position is no longer a
+  pixel rect that happened to suit a 1280×800 Deck. `position_mode: "bottom"` (the new
+  default) ignores `geometry` and computes the spot from the panel: full width, flush with
+  the bottom edge, height a fraction of the display (`dock_height_frac`, 0.42; big mode
+  `big_height_frac`, 0.55). A Deck LCD, a Deck OLED and a Legion Go 2 now get the same
+  keyboard in the same place, which is how Steam's own OSK behaves.
+- **The lock key locks, it no longer moves anything.** Locking used to re-apply the
+  configured geometry, so the keyboard jumped back instead of staying where you dragged
+  it. It now reads back where you left it, forces exactly that rect, and stores it as
+  `position_mode: "custom"`. If the position can't be read back it still locks and leaves
+  the window alone rather than yanking it somewhere you didn't choose.
+- **Reset is its own key** (`kind: "reset"`, ⤓). Puts the keyboard back to the bottom dock
+  and forgets the custom spot.
+- **Unlocked mode looks calmer.** The drag bar was bright orange (it was reusing the
+  active-modifier colour). It's now a dark slate bar with a thin accent line, muted grip
+  labels, and the lock key uses its own accent style instead of the modifier one. Themable
+  via `handle_bg` / `handle_fg`.
+
+### Fixed
+
+- A second instance exiting on the single-instance lock no longer writes a crash log —
+  that's ordinary behaviour when the watchdog and autostart race, not a failure.
+- `geometry` and `big_geometry` are gone from the shipped config; they're derived. The
+  installer now uses `handheld-kbd-dock-rect` to seed the KWin rule so the first show
+  doesn't flash at the wrong size.
+
 ## v1.0.5 — Upgrades that actually upgrade
 
 Two bugs with the same shape: files that were only ever written on a *fresh* install, so

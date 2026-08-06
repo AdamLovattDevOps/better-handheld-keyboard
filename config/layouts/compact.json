@@ -85,6 +85,10 @@
         "kind": "move"
       },
       {
+        "label": "⤓",
+        "kind": "reset"
+      },
+      {
         "label": "⌵",
         "kind": "hide"
       }
