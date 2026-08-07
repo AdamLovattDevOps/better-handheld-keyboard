@@ -51,8 +51,14 @@ proofreader for Arabic, Hebrew, Devanagari and Thai. Corrections very welcome.
 
 - **`handheld-kbd-locales`** — list, add, remove or set the layouts KDE offers, since
   🌐 can only reach layouts KDE has been told about, and with one configured it has
-  nowhere to go. Reports which have labels and which don't, and reminds you that KDE
-  reads its layout list at session start.
+  nowhere to go. Reports which have labels and which don't.
+
+  It also shows which layouts KWin is *actually* running with, and offers to log you
+  out. That distinction matters more than it sounds: KWin builds its xkb keymap when the
+  session starts and there is no way to make it re-read the list — neither
+  `org.kde.KWin.reconfigure` nor reloading kded's keyboard module works, both verified.
+  So a freshly added layout sits in the config file looking configured while 🌐 refuses
+  to reach it, which is a confusing few minutes if nothing says so.
 
 ### Notes on what this can't do
 

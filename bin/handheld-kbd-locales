@@ -70,16 +70,35 @@ def write_layouts(codes):
         kwrite("SwitchMode", "Global")
 
 
+def live():
+    """The layouts KWin has actually loaded, which is not the same as the ones written
+    to kxkbrc — KWin builds its keymap at session start and never re-reads it."""
+    try:
+        out = subprocess.check_output(
+            ["busctl", "--user", "call", "org.kde.keyboard", "/Layouts",
+             "org.kde.KeyboardLayouts", "getLayoutsList"], text=True, timeout=5)
+        parts = out.split('"')[1::2]           # "us" "" "English (US)" "gb" ...
+        return [p for i, p in enumerate(parts) if i % 3 == 0]
+    except Exception:
+        return None
+
+
 def show():
-    avail, have = available(), configured()
+    avail, have, now = available(), configured(), live()
     print(f"{BOLD}Configured in KDE{RESET} (🌐 cycles these, in order)")
     if have:
         for c in have:
             name = avail.get(c)
             mark = f"{GREEN}labels{RESET}" if c in avail else f"{YELLOW}no labels{RESET}"
-            print(f"  {c:6s} {mark:22s} {name or ''}")
+            state = "" if now is None or c in now else f"  {YELLOW}← needs log out{RESET}"
+            print(f"  {c:6s} {mark:22s} {name or ''}{state}")
     else:
         print(f"  {DIM}(none — KDE has no layout list set){RESET}")
+    if now is not None and set(have) - set(now):
+        missing = ", ".join(c for c in have if c not in now)
+        print(f"\n  {YELLOW}KWin is still running with {', '.join(now)}.{RESET} It builds its"
+              f"\n  keymap when the session starts, so {missing} won't be reachable"
+              f"\n  until you log out and back in.")
     if len(have) < 2:
         print(f"\n  {YELLOW}Only one layout: 🌐 has nowhere to switch to.{RESET}"
               f" Add one with 'handheld-kbd-locales add <code>'.")
@@ -99,7 +118,16 @@ def apply(codes, verb):
     if unknown:
         print(f"{YELLOW}!!{RESET} no key labels for: {', '.join(unknown)} — they will type"
               f" correctly but be drawn with US captions.")
-    print(f"{YELLOW}!!{RESET} Log out and back in — KDE reads its layout list at session start.")
+    # KWin builds the xkb keymap when the session starts and there is no way to make it
+    # re-read the list afterwards: neither `org.kde.KWin.reconfigure` nor reloading kded's
+    # keyboard module picks up a new layout. So the logout is not a formality — until it
+    # happens, 🌐 has nothing new to switch to. Offer it rather than only mentioning it.
+    print(f"{YELLOW}!!{RESET} A log out and back in is needed before 🌐 can reach these.")
+    try:
+        subprocess.run([os.path.expanduser("~/.local/bin/handheld-kbd-relogin"), "--prompt"],
+                       timeout=120)
+    except Exception:
+        pass
 
 
 def main():
