@@ -11,9 +11,9 @@ The heading must be `## v<version> — <title>` and the version must match the t
 
 ## v1.0.11 — Twenty languages
 
-Pre-release. The mechanism is tested; the individual layouts are not — I read Latin
-scripts and can spot-check Cyrillic and Greek, and that is the end of my usefulness as a
-proofreader for Arabic, Hebrew, Devanagari and Thai. Corrections very welcome.
+Every one of the twenty languages has been typed into Kate on real hardware — pangram
+plus that layout's currency symbols — saved with Ctrl+S, and the file compared character
+by character with what was meant. All twenty pass.
 
 ### Added
 
@@ -134,7 +134,7 @@ same way. KDE's Latin fallback covers global shortcuts, not an application's own
 by this test failing every save under `ru ua gr ara`, and passing the moment `us` was in
 the group. `handheld-kbd-locales` now warns when a selection has no Latin layout.
 
-### Fixed since rc10
+### Fixed
 
 - **No key is labelled with a character it cannot type.** A layout can define symbols on
   the third level and bind nothing to reach them, and Russian does exactly that: the
@@ -146,7 +146,6 @@ the group. `handheld-kbd-locales` now warns when a selection has no Latin layout
   Found by the language test typing each layout's currency symbols: `₽` was the one
   character out of twenty languages that went in and did not come back.
 
-### Fixed since rc9
 
 - **Uninstalling actually uninstalls.** The removal list was written once and never kept
   up: by v1.0.11 it named seven of the eighteen files an install puts in `~/.local/bin`,
@@ -160,7 +159,6 @@ the group. `handheld-kbd-locales` now warns when a selection has no Latin layout
   its file is gone, so the desktop was still being driven by a keyboard that no longer
   existed.
 
-### Fixed since rc8
 
 - **Upgrading no longer asks for a password you cannot type.** The privileged step —
   the udev rule and `input` group that let the keyboard reach `/dev/uinput` — ran last,
@@ -184,7 +182,6 @@ the group. `handheld-kbd-locales` now warns when a selection has no Latin layout
   AltGr and the level-3 labels in the place a user is most likely to notice being wrong.
   Symbols are taken from each layout's own data rather than assumed.
 
-### Fixed since rc5
 
 - **A label can no longer resize the keyboard.** The key grid is column-homogeneous, so
   every column is as wide as the widest cell — and the 🌐 key reading `🌐LATAM` inflated
