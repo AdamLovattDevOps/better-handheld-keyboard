@@ -223,7 +223,9 @@ keyboard restarts. Layouts and locales sit beside it as plain JSON.
 
 ## Uninstall
 
-`./uninstall.sh` (your config is left in place).
+`./uninstall.sh` — removes the program, autostart, shortcuts, the KWin script and
+the udev rule. Your config in `~/.config/handheld-kbd/` is left in place; delete it
+yourself if you want the learned predictions gone too.
 
 ## Requirements
 
