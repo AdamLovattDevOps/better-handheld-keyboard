@@ -106,6 +106,24 @@ proofreader for Arabic, Hebrew, Devanagari and Thai. Corrections very welcome.
   syllable. Most Vietnamese typing uses an IME (Telex/VNI) over a US layout. That works
   here; the layout is shipped for those who want it.
 
+### Verified
+
+Every one of the twenty languages typed into Kate through `/dev/uinput`, saved with
+Ctrl+S, and the file read back off disk and compared character by character. Key
+positions come from the locale files this keyboard ships, so a label on the wrong key
+fails the test — in scripts nobody here can proofread. `tools/kate-type.py`.
+
+All twenty pass. Spanish, Greek and Vietnamese type everything except the characters
+needing dead-key or combining composition, as expected.
+
+### Known: keep one Latin layout among your four
+
+Application shortcuts are bound to Latin keysyms. With only non-Latin layouts loaded the
+S key produces `Cyrillic_yeru`, and Ctrl+S never reaches Save — Ctrl+C and Ctrl+V go the
+same way. KDE's Latin fallback covers global shortcuts, not an application's own. Found
+by this test failing every save under `ru ua gr ara`, and passing the moment `us` was in
+the group. `handheld-kbd-locales` now warns when a selection has no Latin layout.
+
 ### Fixed since rc5
 
 - **A label can no longer resize the keyboard.** The key grid is column-homogeneous, so
