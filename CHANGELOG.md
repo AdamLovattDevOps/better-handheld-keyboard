@@ -38,6 +38,17 @@ proofreader for Arabic, Hebrew, Devanagari and Thai. Corrections very welcome.
   than printing three glyphs on a key the size of a fingernail. Existing installs get the
   key added to their layout on upgrade.
 
+- **A system tray icon.** Tap it to show or hide the keyboard; right-click for restart,
+  reset position, fix the trackpad pointer, and stop/start. The Show/Hide and Stop/Start
+  entries say which one they'll do, rather than offering you the dead half of the pair.
+
+  It speaks the StatusNotifierItem and DBusMenu protocols to Plasma directly rather than
+  going through libappindicator — SteamOS is an immutable image with no pip and no
+  appindicator package, so a dependency here would be one that cannot be installed. It
+  runs as its own process, because its whole job is rescuing a misbehaving keyboard and
+  "Restart" shouldn't mean killing yourself mid-click. The supervisor keeps it alive, so
+  a Plasma restart doesn't take it away for good.
+
 - **`handheld-kbd-locales`** — list, add, remove or set the layouts KDE offers, since
   🌐 can only reach layouts KDE has been told about, and with one configured it has
   nowhere to go. Reports which have labels and which don't, and reminds you that KDE

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Handheld Keyboard Tray Icon
+Comment=Put a keyboard icon in the system tray — tap to show or hide, right-click for more
+Icon=input-keyboard
+Terminal=false
+Exec=__BIN__/handheld-kbd-tray
+Categories=Utility;Accessibility;
+Keywords=keyboard;tray;systray;indicator;

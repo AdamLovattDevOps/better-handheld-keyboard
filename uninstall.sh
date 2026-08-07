@@ -16,6 +16,8 @@ rm -f "$HOME/.local/bin/handheld-kbd.py" \
       "$HOME/.local/bin/handheld-kbd-ip-remap" \
       "$HOME/.local/bin/handheld-kbd-ctl" \
       "$HOME/.local/bin/handheld-kbd-locales" \
+      "$HOME/.local/bin/handheld-kbd-tray" \
+      "$HOME/.config/autostart/handheld-kbd-tray.desktop" \
       "$HOME/.config/autostart/handheld-kbd.desktop" \
       "$HOME/.config/autostart/handheld-kbd-swap.desktop"
 rm -f "$HOME"/.local/share/applications/handheld-kbd-*.desktop

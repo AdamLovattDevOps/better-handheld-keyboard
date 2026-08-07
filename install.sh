@@ -44,6 +44,7 @@ install -m755 "$HERE/bin/handheld-kbd-install-filter" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-toggle" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-ctl" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-locales" "$BIN/"
+install -m755 "$HERE/bin/handheld-kbd-tray" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-fix-pointer" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-build-dict" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-focus-probe" "$BIN/"
@@ -217,7 +218,9 @@ install -m755 "$HERE/bin/handheld-kbd-kwin-script" "$BIN/"
 sed "s#__BIN__#$BIN#g" "$HERE/autostart/handheld-kbd.desktop"      > "$AUTO/handheld-kbd.desktop"
 sed "s#__BIN__#$BIN#g" "$HERE/autostart/handheld-kbd-swap.desktop" > "$AUTO/handheld-kbd-swap.desktop"
 sed "s#__BIN__#$BIN#g" "$HERE/autostart/handheld-kbd-resume.desktop"   > "$AUTO/handheld-kbd-resume.desktop"
-chmod 644 "$AUTO/handheld-kbd.desktop" "$AUTO/handheld-kbd-swap.desktop" "$AUTO/handheld-kbd-resume.desktop"
+sed "s#__BIN__#$BIN#g" "$HERE/autostart/handheld-kbd-tray.desktop"     > "$AUTO/handheld-kbd-tray.desktop"
+chmod 644 "$AUTO/handheld-kbd.desktop" "$AUTO/handheld-kbd-swap.desktop" \
+          "$AUTO/handheld-kbd-resume.desktop" "$AUTO/handheld-kbd-tray.desktop"
 
 # --- application-menu shortcuts (show/hide, restart, stop, reset position) ---
 # Typing a command is the one thing you can't do when the keyboard is the problem,

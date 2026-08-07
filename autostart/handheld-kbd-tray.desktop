@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Better Handheld Keyboard Tray
+Exec=__BIN__/handheld-kbd-tray
+X-GNOME-Autostart-enabled=true

@@ -56,9 +56,11 @@ So I built the keyboard I wanted instead. Here's what it does differently:
   one — and while Steam thinks its keyboard is open, the sticks and trackpads navigate
   *that* instead of moving the pointer. Steam's keyboard is closed rather than hidden, so
   the pointer stays yours.
-- **Shortcuts for when it goes wrong.** Show/hide, restart, stop, reset position and fix
-  the trackpad pointer all appear in the application menu — clickable, because typing is
-  the one thing you can't do when the keyboard is the problem.
+- **A tray icon.** Tap to show or hide; right-click for restart, reset position, fix the
+  trackpad pointer, stop and start.
+- **Shortcuts for when it goes wrong.** The same actions appear in the application menu —
+  clickable, because typing is the one thing you can't do when the keyboard is the
+  problem.
 - **Swipe typing.** Drag across the letters instead of tapping them. Taps are
   unaffected — a drag only counts once it's unmistakably not one.
 - **Optional summon gestures.** Two-finger swipe up from the bottom edge
@@ -125,6 +127,10 @@ Or click **Fix Trackpad and Stick Pointer** in the application menu. It closes t
 window; no Steam restart, no relogin.
 
 ## Controlling it
+
+The tray icon is the quickest route: tap to show or hide, right-click for the rest. If it
+isn't in your system tray, Plasma may be hiding it — check the tray's overflow arrow, or
+its settings. `handheld-kbd-tray` starts it by hand.
 
 ```bash
 handheld-kbd-ctl status      # what's running, and where the keyboard is
