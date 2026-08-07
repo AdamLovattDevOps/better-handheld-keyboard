@@ -38,6 +38,13 @@ SHIPPED = os.path.join(CFG_DIR, "locales")
 # shipped for twenty layouts; four of them are live at a time, and which four is a
 # config change plus a log out.
 MAX_LAYOUTS = 4
+
+# Layouts whose letters are Latin. At least one wants to be among your four: application
+# shortcuts are bound to Latin keysyms, so under a Cyrillic-only keymap the S key
+# produces Cyrillic_yeru and Ctrl+S never reaches Save. KDE's Latin fallback covers
+# global shortcuts, not an application's own. Verified in Kate on a Legion Go 2 — with
+# only ru/ua/gr/ara loaded, every save silently did nothing.
+LATIN = {"us", "gb", "de", "fr", "es", "latam", "it", "pt", "br", "nl", "pl", "tr", "vn"}
 BOLD, DIM, GREEN, YELLOW, RESET = "\033[1m", "\033[2m", "\033[32m", "\033[33m", "\033[0m"
 
 
@@ -127,6 +134,10 @@ def apply(codes, verb):
     codes = codes[:MAX_LAYOUTS]
     unknown = [c for c in codes if c not in avail]
     write_layouts(codes)
+    if not any(c in LATIN for c in codes):
+        print(f"{YELLOW}!!{RESET} None of these use the Latin alphabet. Application"
+              f" shortcuts are bound to Latin keys,\n   so Ctrl+S, Ctrl+C and the rest"
+              f" will stop working — keep one of us/gb/de/… among the four.")
     if dropped:
         print(f"{YELLOW}!!{RESET} An XKB keymap holds four groups at most, so"
               f" {', '.join(dropped)} {'were' if len(dropped) > 1 else 'was'} left out."
