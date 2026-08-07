@@ -1,0 +1,110 @@
+name: Test
+
+# The keyboard itself needs a compositor, a seat and /dev/uinput, so it isn't testable
+# here. Its *data* is, and that is where the bugs have been: three separate parser
+# faults each shipped a layout that looked plausible and put characters on the wrong
+# keys. In scripts most of us can't read, "looks plausible" is worth nothing — so the
+# labels are checked against libxkbcommon, which is what the compositor will use.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  locales:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install xkb tooling
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libxkbcommon-tools xkb-data
+
+      - name: Every label matches what libxkbcommon says the key types
+        run: python3 tools/verify-locales.py
+
+      - name: Layouts and locales are valid JSON
+        run: |
+          python3 - <<'PY'
+          import json, glob, sys
+          bad = []
+          for p in glob.glob("config/**/*.json", recursive=True):
+              try:
+                  json.load(open(p))
+              except Exception as ex:
+                  bad.append(f"{p}: {ex}")
+          print("\n".join(bad) or f"{len(glob.glob('config/**/*.json', recursive=True))} files ok")
+          sys.exit(1 if bad else 0)
+          PY
+
+      - name: Every layout key names a real evdev code
+        run: |
+          python3 -m pip install --quiet evdev
+          python3 - <<'PY'
+          import json, glob, sys
+          from evdev import ecodes as e
+          bad = []
+          for p in glob.glob("config/layouts/*.json"):
+              for row in json.load(open(p))["rows"]:
+                  for k in row:
+                      name = k.get("key")
+                      if name and not isinstance(getattr(e, name, None), int):
+                          bad.append(f"{p}: unknown key {name!r}")
+          print("\n".join(bad) or "all layout keys resolve")
+          sys.exit(1 if bad else 0)
+          PY
+
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scripts parse
+        run: |
+          for f in install.sh uninstall.sh bin/*.sh bin/handheld-kbd-ctl \
+                   bin/handheld-kbd-toggle bin/handheld-kbd-recover \
+                   bin/handheld-kbd-relogin bin/handheld-kbd-kwin-script \
+                   bin/handheld-kbd-fix-pointer; do
+            [ -f "$f" ] || continue
+            bash -n "$f" && echo "ok  $f"
+          done
+      - name: Python parses
+        run: |
+          for f in bin/*.py bin/handheld-kbd-tray bin/handheld-kbd-locales \
+                   bin/handheld-kbd-build-dict bin/handheld-kbd-install-filter \
+                   tools/*.py; do
+            [ -f "$f" ] || continue
+            python3 -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$f" && echo "ok  $f"
+          done
+
+  upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: A layout from an older release gains this release's new keys
+        # The upgrade path is never exercised by a fresh install, which is exactly why it
+        # broke before: the code for a new key shipped while the user's layout kept no
+        # button for it, so the feature simply never appeared.
+        run: |
+          python3 - <<'PY'
+          import json, os, shutil, subprocess, tempfile
+          NEW = "KEY_RIGHTALT"
+          old = json.load(open("config/layouts/full.json"))
+          for r in old["rows"]:
+              r[:] = [k for k in r if k.get("key") != NEW]
+          d = tempfile.mkdtemp()
+          os.makedirs(d + "/layouts"); os.makedirs(d + "/locales")
+          json.dump(old, open(d + "/layouts/full.json", "w"))
+          json.dump({}, open(d + "/config.json", "w"))
+          lines = open("install.sh").read().split("\n")
+          start = next(i for i, l in enumerate(lines) if l.startswith("python3 - ") and "PY" in l)
+          end = next(i for i in range(start + 1, len(lines)) if lines[i] == "PY")
+          open(d + "/mig.py", "w").write("\n".join(lines[start + 1:end]))
+          subprocess.run(["python3", d + "/mig.py", os.path.abspath("config"), d], check=True)
+          after = json.load(open(d + "/layouts/full.json"))
+          assert any(k.get("key") == NEW for r in after["rows"] for k in r), \
+              "upgrade did not add " + NEW
+          print("upgrade adds", NEW)
+          shutil.rmtree(d)
+          PY
