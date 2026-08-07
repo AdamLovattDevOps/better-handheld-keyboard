@@ -70,9 +70,15 @@ def main():
     ap.add_argument("--keymaps", help="directory of <code>.xkb dumps")
     args = ap.parse_args()
 
-    table = _bl.load_keysyms(os.path.join(HERE, ".xkb", "keysymdef.h")) \
-        if os.path.exists(os.path.join(HERE, ".xkb", "keysymdef.h")) \
-        else _bl.load_keysyms("/usr/include/X11/keysymdef.h")
+    # keysymdef.h wherever it is: a previous build-locales run, the system headers, or
+    # upstream. A machine with xkbcli need not have the X11 development headers.
+    cached = os.path.join(HERE, ".xkb", "keysymdef.h")
+    for path in (cached, "/usr/include/X11/keysymdef.h"):
+        if os.path.exists(path):
+            break
+    else:
+        path = _bl.fetch(_bl.KEYSYMDEF, cached)
+    table = _bl.load_keysyms(path)
 
     index = json.load(open(os.path.join(LOCALES, "index.json")))
     problems = total = 0

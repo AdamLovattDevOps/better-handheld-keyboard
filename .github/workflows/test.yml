@@ -20,7 +20,7 @@ jobs:
       - name: Install xkb tooling
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq libxkbcommon-tools xkb-data
+          sudo apt-get install -y -qq libxkbcommon-tools xkb-data x11proto-dev
 
       - name: Every label matches what libxkbcommon says the key types
         run: python3 tools/verify-locales.py
