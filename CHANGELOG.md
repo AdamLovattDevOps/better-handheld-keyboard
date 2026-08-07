@@ -83,6 +83,12 @@ proofreader for Arabic, Hebrew, Devanagari and Thai. Corrections very welcome.
   🌐 can only reach layouts KDE has been told about, and with one configured it has
   nowhere to go. Reports which have labels and which don't.
 
+  Four layouts can be live at once, and the tool enforces that. An XKB keymap holds
+  four groups — ask libxkbcommon for a fifth and it is discarded outright
+  (`[XKB-595] Unrecognized RMLVO layout "es" was ignored`), so a longer list silently
+  becomes its first four and the rest never appear. Twenty sets of labels ship; which
+  four are live is a `set` plus a log out.
+
   It also shows which layouts KWin is *actually* running with, and offers to log you
   out. That distinction matters more than it sounds: KWin builds its xkb keymap when the
   session starts and there is no way to make it re-read the list — neither
@@ -99,6 +105,24 @@ proofreader for Arabic, Hebrew, Devanagari and Thai. Corrections very welcome.
   and tone marks on `5`–`9` — which costs you the digits and still cannot produce every
   syllable. Most Vietnamese typing uses an IME (Telex/VNI) over a US layout. That works
   here; the layout is shipped for those who want it.
+
+### Fixed since rc5
+
+- **A label can no longer resize the keyboard.** The key grid is column-homogeneous, so
+  every column is as wide as the widest cell — and the 🌐 key reading `🌐LATAM` inflated
+  all thirty-six of them, pushing the window to 1728px on a 1280px desktop. GTK refuses
+  to shrink a window below its natural width, so ⤓ re-docked to 1280, was refused, and
+  looked broken. Labels (and predicted words, which had the same power) now ellipsize;
+  the window's size is the dock's business alone.
+- **The 🌐 badge names what the OS is actually typing.** The layout list was read from
+  `kxkbrc` and the index from the live session — but the file is what the *next* session
+  loads. Edit it and `list[index]` names some other layout: the keyboard drew Brazilian
+  labels while the OS typed US. Both halves now come from the live session.
+- **"Keyboard languages…" in the tray.** A kdialog checklist of all twenty languages —
+  tick up to four, get offered the logout. Configuring the keyboard by typing commands
+  was exactly backwards. Also `handheld-kbd-locales --gui`.
+- **The four-layout ceiling is enforced and explained**, rather than silently truncated
+  by libxkbcommon.
 
 ## v1.0.10 — The Steam Deck keeps its trackpads
 

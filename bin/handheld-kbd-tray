@@ -11,6 +11,7 @@ package, so a dependency here is a dependency that cannot be installed.
 
     handheld-kbd-tray            run it (normally started by autostart)
 """
+import fcntl
 import os
 import signal
 import subprocess
@@ -130,13 +131,15 @@ def kbd_shown():
 class Tray:
     # id: (label, icon, action). 0 is the root, which dbusmenu reserves.
     ACTIONS = {
-        1: ("Show keyboard",         "input-keyboard",  lambda: run(f"{BIN}/handheld-kbd-toggle")),
-        3: ("Restart keyboard",      "view-refresh",    lambda: run(f"{BIN}/handheld-kbd-ctl", "restart")),
-        4: ("Reset position",        "go-bottom",       lambda: run(f"{BIN}/handheld-kbd-ctl", "reset")),
-        5: ("Fix trackpad pointer",  "input-touchpad",  lambda: run(f"{BIN}/handheld-kbd-fix-pointer")),
-        7: ("Stop keyboard",         "process-stop",    lambda: run(f"{BIN}/handheld-kbd-ctl", "stop")),
+        1: ("Show keyboard",         "input-keyboard",         lambda: run(f"{BIN}/handheld-kbd-toggle")),
+        3: ("Restart keyboard",      "view-refresh",           lambda: run(f"{BIN}/handheld-kbd-ctl", "restart")),
+        4: ("Reset position",        "go-bottom",              lambda: run(f"{BIN}/handheld-kbd-ctl", "reset")),
+        5: ("Keyboard languages…",   "preferences-desktop-locale",
+                                                               lambda: run(f"{BIN}/handheld-kbd-locales", "--gui")),
+        6: ("Fix trackpad pointer",  "input-touchpad",         lambda: run(f"{BIN}/handheld-kbd-fix-pointer")),
+        8: ("Stop keyboard",         "process-stop",           lambda: run(f"{BIN}/handheld-kbd-ctl", "stop")),
     }
-    SEPARATORS = (2, 6)
+    SEPARATORS = (2, 7)
 
     def __init__(self):
         self.bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
@@ -150,7 +153,7 @@ class Tray:
             # One entry, not two: "Hide" on a hidden keyboard is a dead option, and a
             # tray menu is read at a glance.
             return "Hide keyboard" if kbd_shown() else "Show keyboard"
-        if item_id == 7 and not kbd_running():
+        if item_id == 8 and not kbd_running():
             return "Start keyboard"
         return text
 
@@ -262,7 +265,21 @@ class Tray:
             return True          # try again on the next tick
 
 
+def single_instance():
+    """Two trays means two identical icons in the panel, which looks like a bug because
+    it is one. Autostart and the supervisor both launch this, deliberately — either alone
+    would leave gaps — so they race at login and a pgrep check loses that race. A lock
+    held for the process's lifetime cannot."""
+    fd = open("/tmp/handheld-kbd-tray.lock", "w")
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        sys.exit(0)
+    return fd                       # returned so it stays open, and the lock held
+
+
 def main():
+    _lock = single_instance()       # noqa: F841
     tray = Tray()
 
     def on_acquired(conn, name, _user=None):
