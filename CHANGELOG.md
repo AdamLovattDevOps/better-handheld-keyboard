@@ -9,6 +9,26 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.0.12 — The pointer survives every trigger mode
+
+Verified on both machines before tagging: on a Legion Go 2 (`mirror: false`), opening
+Steam's OSK now logs `Set OSK active 1` → `0` within the same second and no window is
+left behind; on a Steam Deck (`mirror: true`), the keyboard button still summons and
+dismisses the keyboard exactly as in v1.0.11, with Steam's OSK closed on each press.
+
+### Fixed
+
+- **Dead trackpad and stick pointer on devices that don't mirror Steam's OSK.** While a
+  "Steam Input On-screen Keyboard" window exists — even at zero opacity — Steam holds the
+  controller in its KB ActionSet, where the sticks and trackpads navigate that keyboard
+  instead of moving the desktop pointer. The KWin script made Steam's OSK transparent in
+  every trigger mode, but only *closed* it in mirror mode. So a Deck (mirror) got its
+  pointer back, while a device on the DBus or hotkey trigger (`mirror: false`) collected
+  an invisible-but-mapped Steam OSK the first time anything opened it — a controller
+  focusing a text field, `steam steam://open/keyboard` — and lost its pointer until
+  `handheld-kbd-fix-pointer` was run by hand. The close now fires in every trigger mode;
+  mirror mode's summon/dismiss toggle is untouched.
+
 ## v1.0.11 — Twenty languages
 
 Every one of the twenty languages has been typed into Kate on real hardware — pangram
