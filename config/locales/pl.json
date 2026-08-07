@@ -1,5 +1,6 @@
 {
   "KEY_0": {
+    "alt": "»",
     "label": "0",
     "shifted": ")"
   },
@@ -44,6 +45,7 @@
     "shifted": "*"
   },
   "KEY_9": {
+    "alt": "«",
     "label": "9",
     "shifted": "("
   },

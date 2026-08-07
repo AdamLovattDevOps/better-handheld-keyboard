@@ -115,14 +115,39 @@ def fetch(url, path):
 
 
 def load_keysyms(path):
-    """keysym name -> character, from keysymdef.h's U+XXXX comments."""
-    table = {}
-    pat = re.compile(r"^#define\s+XK_(\w+)\s+0x[0-9a-fA-F]+\s*/\*[<\s]*U\+([0-9A-Fa-f]{4,6})")
+    """keysym name -> character, from keysymdef.h.
+
+    Resolution goes through the keysym *code*, not the name's own comment. Several names
+    share a code, and only one of them carries the U+ annotation — the others say things
+    like "deprecated alias for guillemetleft (misspelling)". Reading comments alone lost
+    `masculine`, `guillemotleft` and `guillemotright`, and with them the º key on the
+    Spanish layout and « » on the Portuguese one, because a key whose first level does
+    not resolve is dropped entirely.
+    """
+    define = re.compile(r"^#define\s+XK_(\w+)\s+0x([0-9a-fA-F]+)")
+    unicode_note = re.compile(r"/\*[(<\s]*U\+([0-9A-Fa-f]{4,6})")
+    names, code_char = {}, {}
     with open(path, encoding="utf-8", errors="replace") as f:
         for line in f:
-            m = pat.match(line)
-            if m:
-                table[m.group(1)] = chr(int(m.group(2), 16))
+            m = define.match(line)
+            if not m:
+                continue
+            name, code = m.group(1), int(m.group(2), 16)
+            names[name] = code
+            u = unicode_note.search(line)
+            if u:
+                code_char.setdefault(code, chr(int(u.group(1), 16)))
+
+    table = {}
+    for name, code in names.items():
+        ch = code_char.get(code)
+        if ch is None and 0x20 <= code <= 0xFF:
+            # Latin-1 keysyms are their own code points, by definition.
+            ch = chr(code)
+        if ch is None and code & 0xFF000000 == 0x01000000:
+            ch = chr(code & 0x00FFFFFF)
+        if ch is not None:
+            table[name] = ch
     table.update(DEAD_KEYS)
     return table
 
@@ -170,6 +195,12 @@ class Symbols:
                 text = f.read()
         except Exception:
             text = ""
+        # Strip comments before anything else looks at the text. These files annotate keys
+        # with the characters they produce, and those annotations contain braces —
+        # symbols/ara has `key <AB03> {[...]};  // ؤ }` — which the block scanner counted,
+        # ending the Arabic layout after three keys and silently losing the other seven.
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+        text = re.sub(r"//[^\n]*", "", text)
         self.cache[name] = text
         return text
 

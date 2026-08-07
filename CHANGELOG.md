@@ -30,7 +30,21 @@ proofreader for Arabic, Hebrew, Devanagari and Thai. Corrections very welcome.
   They are generated from [xkeyboard-config](https://gitlab.freedesktop.org/xkeyboard-config/xkeyboard-config)
   and xorgproto's `keysymdef.h` by `tools/build-locales.py`, and committed. Typing them
   out by hand would have been twenty chances to be subtly wrong in scripts I cannot
-  proofread.
+  proofread. All twenty resolve all 47 keys — anything less is treated as a parser bug,
+  which is how these were found:
+
+  - Comments were counted when scanning for the end of a block. These files annotate keys
+    with the characters they produce, and those annotations contain braces —
+    `key <AB03> {[...]};  // ؤ }` — so the Arabic layout ended after three keys and
+    silently lost the other seven, leaving `v b n m , . /` drawn in Latin.
+  - Keysyms were resolved by their own `U+` comment, but several names share a code and
+    only one carries the annotation; the rest read "deprecated alias for …". That lost
+    `masculine` and `guillemotleft`, and with them `º` on the Spanish layout and `«` `»`
+    on the Portuguese one. Resolution now goes through the keysym code.
+  - Greek redefines only levels 3 and 4 over `gr(simple)` using `any` for the first two,
+    so replacing whole entries threw the alphabet away — levels merge individually now.
+  - `key <AD08> { type[group1] = "…", [ i, I ] }` — that first bracket is not a symbol
+    list, and taking it lost Turkish's dotted/dotless `i`.
 
 - **AltGr.** Most non-English layouts keep a third of their characters on the third level
   — Polish `ą`, French `@`, Turkish `î`, Italian `[` — and without an AltGr key they were
@@ -48,6 +62,14 @@ proofreader for Arabic, Hebrew, Devanagari and Thai. Corrections very welcome.
   runs as its own process, because its whole job is rescuing a misbehaving keyboard and
   "Restart" shouldn't mean killing yourself mid-click. The supervisor keeps it alive, so
   a Plasma restart doesn't take it away for good.
+
+  Its own process turned out not to be enough. The supervisor runs as a transient systemd
+  unit, and stopping a unit stops its whole cgroup — which contained the tray *and* the
+  restart script the tray had just launched. The stop half ran, the start half never did,
+  and the keyboard did not come back. `start_new_session()` does not help; a cgroup is not
+  a session. The tray is now a unit in its own right, and `handheld-kbd-ctl` re-runs
+  itself in a transient unit before touching anything, so it cannot be killed by the stop
+  it just issued.
 
 - **`handheld-kbd-locales`** — list, add, remove or set the layouts KDE offers, since
   🌐 can only reach layouts KDE has been told about, and with one configured it has

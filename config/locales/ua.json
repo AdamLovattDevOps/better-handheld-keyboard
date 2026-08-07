@@ -40,6 +40,7 @@
     "shifted": "?"
   },
   "KEY_8": {
+    "alt": "•",
     "label": "8",
     "shifted": "*"
   },
@@ -67,12 +68,14 @@
     "label": "с"
   },
   "KEY_COMMA": {
+    "alt": "«",
     "label": "б"
   },
   "KEY_D": {
     "label": "в"
   },
   "KEY_DOT": {
+    "alt": "»",
     "label": "ю"
   },
   "KEY_E": {

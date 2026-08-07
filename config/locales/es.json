@@ -101,6 +101,11 @@
     "alt": "ŋ",
     "label": "g"
   },
+  "KEY_GRAVE": {
+    "alt": "\\",
+    "label": "º",
+    "shifted": "ª"
+  },
   "KEY_H": {
     "alt": "ħ",
     "label": "h"
@@ -190,6 +195,7 @@
     "label": "w"
   },
   "KEY_X": {
+    "alt": "»",
     "label": "x"
   },
   "KEY_Y": {
@@ -197,6 +203,7 @@
     "label": "y"
   },
   "KEY_Z": {
+    "alt": "«",
     "label": "z"
   }
 }

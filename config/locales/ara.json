@@ -58,6 +58,10 @@
     "label": "ط",
     "shifted": "\""
   },
+  "KEY_B": {
+    "label": "ﻻ",
+    "shifted": "ﻵ"
+  },
   "KEY_BACKSLASH": {
     "alt": "⟨",
     "label": "\\",
@@ -67,9 +71,19 @@
     "label": "ؤ",
     "shifted": "}"
   },
+  "KEY_COMMA": {
+    "alt": "٬",
+    "label": "و",
+    "shifted": ","
+  },
   "KEY_D": {
     "label": "ي",
     "shifted": "]"
+  },
+  "KEY_DOT": {
+    "alt": "ژ",
+    "label": "ز",
+    "shifted": "."
   },
   "KEY_E": {
     "label": "ث",
@@ -121,10 +135,19 @@
     "label": "ج",
     "shifted": "<"
   },
+  "KEY_M": {
+    "label": "ة",
+    "shifted": "'"
+  },
   "KEY_MINUS": {
     "alt": "–",
     "label": "-",
     "shifted": "_"
+  },
+  "KEY_N": {
+    "alt": "ٰ",
+    "label": "ى",
+    "shifted": "آ"
   },
   "KEY_O": {
     "label": "خ",
@@ -155,6 +178,11 @@
     "label": "ك",
     "shifted": ":"
   },
+  "KEY_SLASH": {
+    "alt": "٭",
+    "label": "ظ",
+    "shifted": "؟"
+  },
   "KEY_T": {
     "alt": "ڤ",
     "label": "ف",
@@ -164,11 +192,16 @@
     "label": "ع",
     "shifted": "`"
   },
+  "KEY_V": {
+    "label": "ر",
+    "shifted": "{"
+  },
   "KEY_W": {
     "label": "ص",
     "shifted": "ً"
   },
   "KEY_X": {
+    "alt": "«",
     "label": "ء",
     "shifted": "ْ"
   },
@@ -177,6 +210,7 @@
     "shifted": "إ"
   },
   "KEY_Z": {
+    "alt": "»",
     "label": "ئ",
     "shifted": "~"
   }

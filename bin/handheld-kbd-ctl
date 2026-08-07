@@ -21,6 +21,25 @@ SUP_PAT='handheld-kbd-swap\.sh'
 
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 
+# Get out of the keyboard's own cgroup before touching it.
+#
+# The supervisor runs as a transient systemd unit, and the tray is one of its children —
+# so is this script when the tray launches it. Stopping that unit kills its entire cgroup,
+# which is the tray, and this script, mid-restart: the stop half ran, the start half never
+# did, and the keyboard did not come back. start_new_session() does not help; a cgroup is
+# not a session. Re-run ourselves in a transient unit of our own, which nothing here stops.
+if [ -z "${HK_DETACHED:-}" ] && command -v systemd-run >/dev/null 2>&1; then
+    case "${1:-restart}" in
+        start|stop|restart)
+            if grep -qs 'handheld-kbd' /proc/self/cgroup; then
+                exec systemd-run --user --collect --quiet --pipe \
+                     --unit="handheld-kbd-ctl-$$" --setenv=HK_DETACHED=1 \
+                     -- "$0" "$@"
+            fi
+            ;;
+    esac
+fi
+
 # Match by pattern but never kill ourselves or our own parents: `handheld-kbd-ctl`
 # run from a shell whose argv mentions the pattern would otherwise take the shell
 # with it, which is a memorable way to lose an SSH session.

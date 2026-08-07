@@ -139,9 +139,16 @@ while true; do
 
     # The tray icon is the way back when the keyboard misbehaves, so it is the last
     # thing that should be missing. Plasma restarts take it with them.
+    # Started as its own systemd unit, not as our child: stopping this supervisor stops
+    # its whole cgroup, and the tray is the one thing that must survive a keyboard
+    # restart — it is where the user clicked "Restart" from.
     if [ -x "$HOME/.local/bin/handheld-kbd-tray" ] \
        && ! pgrep -f 'python3 .*handheld-kbd-tray' >/dev/null; then
-        setsid python3 "$HOME/.local/bin/handheld-kbd-tray" </dev/null >>/tmp/handheld-kbd-tray.log 2>&1 &
+        systemctl --user reset-failed handheld-kbd-tray >/dev/null 2>&1
+        systemd-run --user --collect --quiet --unit=handheld-kbd-tray \
+            python3 "$HOME/.local/bin/handheld-kbd-tray" >/dev/null 2>&1 \
+          || setsid python3 "$HOME/.local/bin/handheld-kbd-tray" </dev/null \
+               >>/tmp/handheld-kbd-tray.log 2>&1 &
     fi
 
     # Watchdog: the keyboard's Wayland connection drops when Steam restarts or the

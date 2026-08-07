@@ -63,6 +63,7 @@
     "label": "b"
   },
   "KEY_BACKSLASH": {
+    "alt": "º",
     "label": "]",
     "shifted": "}"
   },
@@ -194,6 +195,7 @@
     "label": "w"
   },
   "KEY_X": {
+    "alt": "»",
     "label": "x"
   },
   "KEY_Y": {
@@ -201,6 +203,7 @@
     "label": "y"
   },
   "KEY_Z": {
+    "alt": "«",
     "label": "z"
   }
 }

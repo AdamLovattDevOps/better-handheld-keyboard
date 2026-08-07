@@ -194,6 +194,7 @@
     "label": "w"
   },
   "KEY_X": {
+    "alt": "«",
     "label": "x"
   },
   "KEY_Y": {
@@ -201,6 +202,7 @@
     "label": "z"
   },
   "KEY_Z": {
+    "alt": "»",
     "label": "y"
   }
 }

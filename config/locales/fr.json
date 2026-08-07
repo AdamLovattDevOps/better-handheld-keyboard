@@ -192,9 +192,11 @@
     "label": "v"
   },
   "KEY_W": {
+    "alt": "«",
     "label": "z"
   },
   "KEY_X": {
+    "alt": "»",
     "label": "x"
   },
   "KEY_Y": {
