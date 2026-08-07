@@ -6,24 +6,33 @@ RULE_UUID="a8a95de3-82aa-4998-87c0-125fb8525143"
 say() { printf '\033[1;36m::\033[0m %s\n' "$*"; }
 
 say "Stopping running keyboard…"
+# Units first. They are what restarts the supervisor, so pkill on its own removes the
+# process and gets a fresh one two seconds later.
+systemctl --user stop handheld-kbd handheld-kbd-tray 2>/dev/null
+systemctl --user reset-failed handheld-kbd handheld-kbd-tray 2>/dev/null
 pkill -f 'python3 .*handheld-kbd\.py' 2>/dev/null
+pkill -f 'python3 .*handheld-kbd-tray' 2>/dev/null
 pkill -f 'handheld-kbd-swap\.sh' 2>/dev/null
 
 say "Removing program + autostart + KWin script…"
-rm -f "$HOME/.local/bin/handheld-kbd.py" \
-      "$HOME/.local/bin/handheld-kbd-swap.sh" \
-      "$HOME/.local/bin/handheld-kbd-relogin" \
-      "$HOME/.local/bin/handheld-kbd-ip-remap" \
-      "$HOME/.local/bin/handheld-kbd-ctl" \
-      "$HOME/.local/bin/handheld-kbd-locales" \
-      "$HOME/.local/bin/handheld-kbd-tray" \
-      "$HOME/.config/autostart/handheld-kbd-tray.desktop" \
-      "$HOME/.config/autostart/handheld-kbd.desktop" \
-      "$HOME/.config/autostart/handheld-kbd-swap.desktop"
+# Glob rather than a list of names. The list was written once and never kept up: by
+# v1.0.11 it named seven of the eighteen files an install puts in ~/.local/bin, so
+# "uninstalled" left most of the program behind. Anything this project installs is
+# named handheld-kbd-* or handheld_kbd_*, so match that and nothing else.
+rm -f "$HOME"/.local/bin/handheld-kbd-* \
+      "$HOME"/.local/bin/handheld-kbd.py \
+      "$HOME"/.local/bin/handheld_kbd_*.py
+rm -f "$HOME"/.config/autostart/handheld-kbd-*.desktop \
+      "$HOME"/.config/autostart/handheld-kbd.desktop \
+      "$HOME"/.config/autostart/handheld-kbd*.desktop.disabled
 rm -f "$HOME"/.local/share/applications/handheld-kbd-*.desktop
 command -v update-desktop-database >/dev/null 2>&1 && \
   update-desktop-database "$HOME/.local/share/applications" 2>/dev/null
 rm -rf "$HOME/.local/share/kwin/scripts/handheld-kbd-opacity"
+rm -rf "$HOME/.local/lib/handheld-kbd"          # the bundled suggestion filter
+# The script keeps running in the session after its files are gone — unload it, or the
+# desktop is still being driven by a keyboard that no longer exists.
+qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript handheld-kbd-opacity >/dev/null 2>&1 || true
 
 # restore the hardware keyboard button (we remapped it via InputPlumber)
 say "Restoring InputPlumber default profile…"

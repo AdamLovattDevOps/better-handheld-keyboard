@@ -134,6 +134,20 @@ same way. KDE's Latin fallback covers global shortcuts, not an application's own
 by this test failing every save under `ru ua gr ara`, and passing the moment `us` was in
 the group. `handheld-kbd-locales` now warns when a selection has no Latin layout.
 
+### Fixed since rc9
+
+- **Uninstalling actually uninstalls.** The removal list was written once and never kept
+  up: by v1.0.11 it named seven of the eighteen files an install puts in `~/.local/bin`,
+  so "Uninstalled." left most of the program behind, along with two autostart entries and
+  the bundled suggestion filter. It matches `handheld-kbd-*` now, which is what everything
+  this project installs is called.
+- **Uninstalling stops the keyboard for good.** It used `pkill`, and the supervisor runs
+  as a systemd unit — so the process died and a fresh one arrived two seconds later. The
+  units are stopped first.
+- **The KWin script is unloaded, not just deleted.** It keeps running in the session after
+  its file is gone, so the desktop was still being driven by a keyboard that no longer
+  existed.
+
 ### Fixed since rc8
 
 - **Upgrading no longer asks for a password you cannot type.** The privileged step —
