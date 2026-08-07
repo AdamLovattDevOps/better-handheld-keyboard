@@ -1,0 +1,190 @@
+{
+  "KEY_0": {
+    "label": "จ",
+    "shifted": "๗"
+  },
+  "KEY_1": {
+    "label": "ๅ",
+    "shifted": "+"
+  },
+  "KEY_2": {
+    "label": "/",
+    "shifted": "๑"
+  },
+  "KEY_3": {
+    "label": "-",
+    "shifted": "๒"
+  },
+  "KEY_4": {
+    "label": "ภ",
+    "shifted": "๓"
+  },
+  "KEY_5": {
+    "label": "ถ",
+    "shifted": "๔"
+  },
+  "KEY_6": {
+    "label": "ุ",
+    "shifted": "ู"
+  },
+  "KEY_7": {
+    "label": "ึ",
+    "shifted": "฿"
+  },
+  "KEY_8": {
+    "label": "ค",
+    "shifted": "๕"
+  },
+  "KEY_9": {
+    "label": "ต",
+    "shifted": "๖"
+  },
+  "KEY_A": {
+    "label": "ฟ",
+    "shifted": "ฤ"
+  },
+  "KEY_APOSTROPHE": {
+    "label": "ง",
+    "shifted": "."
+  },
+  "KEY_B": {
+    "label": "ิ",
+    "shifted": "ฺ"
+  },
+  "KEY_BACKSLASH": {
+    "label": "ฃ",
+    "shifted": "ฅ"
+  },
+  "KEY_C": {
+    "label": "แ",
+    "shifted": "ฉ"
+  },
+  "KEY_COMMA": {
+    "label": "ม",
+    "shifted": "ฒ"
+  },
+  "KEY_D": {
+    "label": "ก",
+    "shifted": "ฏ"
+  },
+  "KEY_DOT": {
+    "label": "ใ",
+    "shifted": "ฬ"
+  },
+  "KEY_E": {
+    "label": "ำ",
+    "shifted": "ฎ"
+  },
+  "KEY_EQUAL": {
+    "label": "ช",
+    "shifted": "๙"
+  },
+  "KEY_F": {
+    "label": "ด",
+    "shifted": "โ"
+  },
+  "KEY_G": {
+    "label": "เ",
+    "shifted": "ฌ"
+  },
+  "KEY_GRAVE": {
+    "label": "_",
+    "shifted": "%"
+  },
+  "KEY_H": {
+    "label": "้",
+    "shifted": "็"
+  },
+  "KEY_I": {
+    "label": "ร",
+    "shifted": "ณ"
+  },
+  "KEY_J": {
+    "label": "่",
+    "shifted": "๋"
+  },
+  "KEY_K": {
+    "label": "า",
+    "shifted": "ษ"
+  },
+  "KEY_L": {
+    "label": "ส",
+    "shifted": "ศ"
+  },
+  "KEY_LEFTBRACE": {
+    "label": "บ",
+    "shifted": "ฐ"
+  },
+  "KEY_M": {
+    "label": "ท",
+    "shifted": "?"
+  },
+  "KEY_MINUS": {
+    "label": "ข",
+    "shifted": "๘"
+  },
+  "KEY_N": {
+    "label": "ื",
+    "shifted": "์"
+  },
+  "KEY_O": {
+    "label": "น",
+    "shifted": "ฯ"
+  },
+  "KEY_P": {
+    "label": "ย",
+    "shifted": "ญ"
+  },
+  "KEY_Q": {
+    "label": "ๆ",
+    "shifted": "๐"
+  },
+  "KEY_R": {
+    "label": "พ",
+    "shifted": "ฑ"
+  },
+  "KEY_RIGHTBRACE": {
+    "label": "ล",
+    "shifted": ","
+  },
+  "KEY_S": {
+    "label": "ห",
+    "shifted": "ฆ"
+  },
+  "KEY_SEMICOLON": {
+    "label": "ว",
+    "shifted": "ซ"
+  },
+  "KEY_SLASH": {
+    "label": "ฝ",
+    "shifted": "ฦ"
+  },
+  "KEY_T": {
+    "label": "ะ",
+    "shifted": "ธ"
+  },
+  "KEY_U": {
+    "label": "ี",
+    "shifted": "๊"
+  },
+  "KEY_V": {
+    "label": "อ",
+    "shifted": "ฮ"
+  },
+  "KEY_W": {
+    "label": "ไ",
+    "shifted": "\""
+  },
+  "KEY_X": {
+    "label": "ป",
+    "shifted": ")"
+  },
+  "KEY_Y": {
+    "label": "ั",
+    "shifted": "ํ"
+  },
+  "KEY_Z": {
+    "label": "ผ",
+    "shifted": "("
+  }
+}

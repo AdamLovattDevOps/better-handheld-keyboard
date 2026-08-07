@@ -1,0 +1,215 @@
+{
+  "KEY_0": {
+    "alt": "0",
+    "label": "०",
+    "shifted": ")"
+  },
+  "KEY_1": {
+    "alt": "1",
+    "label": "१",
+    "shifted": "ऍ"
+  },
+  "KEY_2": {
+    "alt": "2",
+    "label": "२",
+    "shifted": "ॅ"
+  },
+  "KEY_3": {
+    "alt": "3",
+    "label": "३",
+    "shifted": "#"
+  },
+  "KEY_4": {
+    "alt": "4",
+    "label": "४",
+    "shifted": "$"
+  },
+  "KEY_5": {
+    "alt": "5",
+    "label": "५",
+    "shifted": "%"
+  },
+  "KEY_6": {
+    "alt": "6",
+    "label": "६",
+    "shifted": "^"
+  },
+  "KEY_7": {
+    "alt": "7",
+    "label": "७",
+    "shifted": "&"
+  },
+  "KEY_8": {
+    "alt": "8",
+    "label": "८",
+    "shifted": "*"
+  },
+  "KEY_9": {
+    "alt": "9",
+    "label": "९",
+    "shifted": "("
+  },
+  "KEY_A": {
+    "label": "ो",
+    "shifted": "ओ"
+  },
+  "KEY_APOSTROPHE": {
+    "label": "ट",
+    "shifted": "ठ"
+  },
+  "KEY_B": {
+    "label": "व",
+    "shifted": "ऴ"
+  },
+  "KEY_BACKSLASH": {
+    "alt": "\\",
+    "label": "ॉ",
+    "shifted": "ऑ"
+  },
+  "KEY_C": {
+    "alt": "॔",
+    "label": "म",
+    "shifted": "ण"
+  },
+  "KEY_COMMA": {
+    "alt": "॰",
+    "label": ",",
+    "shifted": "ष"
+  },
+  "KEY_D": {
+    "label": "्",
+    "shifted": "अ"
+  },
+  "KEY_DOT": {
+    "alt": "॥",
+    "label": ".",
+    "shifted": "।"
+  },
+  "KEY_E": {
+    "label": "ा",
+    "shifted": "आ"
+  },
+  "KEY_EQUAL": {
+    "alt": "ॄ",
+    "label": "ृ",
+    "shifted": "ऋ"
+  },
+  "KEY_F": {
+    "alt": "ॢ",
+    "label": "ि",
+    "shifted": "इ"
+  },
+  "KEY_G": {
+    "label": "ु",
+    "shifted": "उ"
+  },
+  "KEY_GRAVE": {
+    "alt": "`",
+    "label": "ॊ",
+    "shifted": "ऒ"
+  },
+  "KEY_H": {
+    "label": "प",
+    "shifted": "फ"
+  },
+  "KEY_I": {
+    "alt": "ग़",
+    "label": "ग",
+    "shifted": "घ"
+  },
+  "KEY_J": {
+    "label": "र",
+    "shifted": "ऱ"
+  },
+  "KEY_K": {
+    "alt": "क़",
+    "label": "क",
+    "shifted": "ख"
+  },
+  "KEY_L": {
+    "label": "त",
+    "shifted": "थ"
+  },
+  "KEY_LEFTBRACE": {
+    "alt": "ड़",
+    "label": "ड",
+    "shifted": "ढ"
+  },
+  "KEY_M": {
+    "label": "स",
+    "shifted": "श"
+  },
+  "KEY_MINUS": {
+    "label": "-",
+    "shifted": "ः"
+  },
+  "KEY_N": {
+    "label": "ल",
+    "shifted": "ळ"
+  },
+  "KEY_O": {
+    "label": "द",
+    "shifted": "ध"
+  },
+  "KEY_P": {
+    "alt": "ज़",
+    "label": "ज",
+    "shifted": "झ"
+  },
+  "KEY_Q": {
+    "label": "ौ",
+    "shifted": "औ"
+  },
+  "KEY_R": {
+    "alt": "ॣ",
+    "label": "ी",
+    "shifted": "ई"
+  },
+  "KEY_RIGHTBRACE": {
+    "label": "़",
+    "shifted": "ञ"
+  },
+  "KEY_S": {
+    "label": "े",
+    "shifted": "ए"
+  },
+  "KEY_SEMICOLON": {
+    "alt": "॒",
+    "label": "च",
+    "shifted": "छ"
+  },
+  "KEY_SLASH": {
+    "alt": "/",
+    "label": "य",
+    "shifted": "य़"
+  },
+  "KEY_T": {
+    "label": "ू",
+    "shifted": "ऊ"
+  },
+  "KEY_U": {
+    "label": "ह",
+    "shifted": "ङ"
+  },
+  "KEY_V": {
+    "label": "न",
+    "shifted": "ऩ"
+  },
+  "KEY_W": {
+    "label": "ै",
+    "shifted": "ऐ"
+  },
+  "KEY_X": {
+    "label": "ं",
+    "shifted": "ँ"
+  },
+  "KEY_Y": {
+    "label": "ब",
+    "shifted": "भ"
+  },
+  "KEY_Z": {
+    "alt": "॓",
+    "label": "ॆ",
+    "shifted": "ऎ"
+  }
+}

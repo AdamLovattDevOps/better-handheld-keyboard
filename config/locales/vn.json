@@ -1,87 +1,67 @@
 {
   "KEY_0": {
-    "alt": "}",
-    "label": "0",
-    "shifted": ")"
+    "label": "đ"
   },
   "KEY_1": {
-    "alt": "¹",
-    "label": "1",
-    "shifted": "!"
+    "label": "ă"
   },
   "KEY_2": {
-    "alt": "²",
-    "label": "2",
-    "shifted": "\""
+    "label": "â"
   },
   "KEY_3": {
-    "alt": "³",
-    "label": "3",
-    "shifted": "£"
+    "label": "ê"
   },
   "KEY_4": {
-    "alt": "€",
-    "label": "4",
-    "shifted": "$"
+    "label": "ô"
   },
   "KEY_5": {
-    "alt": "½",
-    "label": "5",
+    "alt": "`",
+    "label": "◌̀",
     "shifted": "%"
   },
   "KEY_6": {
-    "alt": "¾",
-    "label": "6",
+    "label": "◌̉",
     "shifted": "^"
   },
   "KEY_7": {
-    "alt": "{",
-    "label": "7",
+    "alt": "˜",
+    "label": "◌̃",
     "shifted": "&"
   },
   "KEY_8": {
-    "alt": "[",
-    "label": "8",
+    "alt": "´",
+    "label": "◌́",
     "shifted": "*"
   },
   "KEY_9": {
-    "alt": "]",
-    "label": "9",
+    "label": "◌̣",
     "shifted": "("
   },
   "KEY_A": {
-    "alt": "æ",
     "label": "a"
   },
   "KEY_APOSTROPHE": {
-    "alt": "ˆ",
     "label": "'",
-    "shifted": "@"
+    "shifted": "\""
   },
   "KEY_B": {
-    "alt": "“",
     "label": "b"
   },
   "KEY_BACKSLASH": {
-    "alt": "`",
-    "label": "#",
-    "shifted": "~"
+    "label": "\\",
+    "shifted": "|"
   },
   "KEY_C": {
-    "alt": "¢",
     "label": "c"
   },
   "KEY_COMMA": {
-    "alt": "•",
     "label": ",",
     "shifted": "<"
   },
   "KEY_D": {
-    "alt": "ð",
     "label": "d"
   },
   "KEY_DOT": {
-    "alt": "·",
     "label": ".",
     "shifted": ">"
   },
@@ -89,117 +69,89 @@
     "label": "e"
   },
   "KEY_EQUAL": {
-    "alt": "¸",
-    "label": "=",
+    "label": "₫",
     "shifted": "+"
   },
   "KEY_F": {
-    "alt": "đ",
     "label": "f"
   },
   "KEY_G": {
-    "alt": "ŋ",
     "label": "g"
   },
   "KEY_GRAVE": {
-    "alt": "|",
     "label": "`",
-    "shifted": "¬"
+    "shifted": "~"
   },
   "KEY_H": {
-    "alt": "ħ",
     "label": "h"
   },
   "KEY_I": {
-    "alt": "→",
     "label": "i"
   },
   "KEY_J": {
-    "alt": "◌̉",
     "label": "j"
   },
   "KEY_K": {
-    "alt": "ĸ",
     "label": "k"
   },
   "KEY_L": {
-    "alt": "ł",
     "label": "l"
   },
   "KEY_LEFTBRACE": {
-    "alt": "¨",
-    "label": "[",
-    "shifted": "{"
+    "label": "ư"
   },
   "KEY_M": {
-    "alt": "µ",
     "label": "m"
   },
   "KEY_MINUS": {
-    "alt": "\\",
     "label": "-",
     "shifted": "_"
   },
   "KEY_N": {
-    "alt": "”",
     "label": "n"
   },
   "KEY_O": {
-    "alt": "ø",
     "label": "o"
   },
   "KEY_P": {
-    "alt": "þ",
     "label": "p"
   },
   "KEY_Q": {
-    "alt": "@",
     "label": "q"
   },
   "KEY_R": {
-    "alt": "¶",
     "label": "r"
   },
   "KEY_RIGHTBRACE": {
-    "alt": "˜",
-    "label": "]",
-    "shifted": "}"
+    "label": "ơ"
   },
   "KEY_S": {
-    "alt": "ß",
     "label": "s"
   },
   "KEY_SEMICOLON": {
-    "alt": "´",
     "label": ";",
     "shifted": ":"
   },
   "KEY_SLASH": {
-    "alt": "◌̣",
     "label": "/",
     "shifted": "?"
   },
   "KEY_T": {
-    "alt": "ŧ",
     "label": "t"
   },
   "KEY_U": {
-    "alt": "↓",
     "label": "u"
   },
   "KEY_V": {
-    "alt": "„",
     "label": "v"
   },
   "KEY_W": {
-    "alt": "ſ",
     "label": "w"
   },
   "KEY_X": {
     "label": "x"
   },
   "KEY_Y": {
-    "alt": "←",
     "label": "y"
   },
   "KEY_Z": {

@@ -24,12 +24,25 @@ jobs:
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
           # The section runs from its own '## v<version>' heading to the next '## ' heading.
-          awk -v v="$version" '
-            $0 ~ "^## v" v "([^0-9.]|$)" { found = 1; sub(/^## /, ""); title = $0; next }
-            found && /^## / { exit }
-            found { print }
-          ' CHANGELOG.md > notes.md
-          title=$(awk -v v="$version" '$0 ~ "^## v" v "([^0-9.]|$)" { sub(/^## /, ""); print; exit }' CHANGELOG.md)
+          notes() {
+            awk -v v="$1" '
+              $0 ~ "^## v" v "([^0-9.]|$)" { found = 1; next }
+              found && /^## / { exit }
+              found { print }
+            ' CHANGELOG.md
+          }
+          heading() {
+            awk -v v="$1" '$0 ~ "^## v" v "([^0-9.]|$)" { sub(/^## /, ""); print; exit }' CHANGELOG.md
+          }
+          notes "$version" > notes.md
+          title=$(heading "$version")
+          # A pre-release tag (v1.2.3-rc1) documents the version it is a candidate for, so
+          # fall back to that section rather than demanding a heading per candidate.
+          if [ ! -s notes.md ] && [ "$version" != "${version%%-*}" ]; then
+            version="${version%%-*}"
+            notes "$version" > notes.md
+            title=$(heading "$version")
+          fi
           if [ ! -s notes.md ] || [ -z "$title" ]; then
             echo "::error::CHANGELOG.md has no '## v$version' section — add one before tagging."
             exit 1

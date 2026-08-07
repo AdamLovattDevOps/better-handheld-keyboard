@@ -27,8 +27,13 @@ So I built the keyboard I wanted instead. Here's what it does differently:
   behind it.
 - **It's mine to theme, and yours too.** Layout, colours, key sizes, and opacity
   all live in a JSON file. No code to touch.
-- **US / UK layouts.** A 🌐 key flips the layout so `£`, `@`, `#`, `"` land where
-  they should.
+- **Twenty layouts.** English (US/UK), German, French, Spanish (Spain and Latin
+  America), Italian, Portuguese (Portugal and Brazil), Dutch, Polish, Turkish,
+  Russian, Ukrainian, Greek, Arabic, Hebrew, Hindi, Thai and Vietnamese. The 🌐 key
+  switches between the ones you've configured and re-skins the keys, so `£`, `ñ`, `ç`,
+  `й` and `ก` are drawn where they actually are. `handheld-kbd-locales` picks which.
+- **AltGr.** Most layouts keep a third of their alphabet behind it — Polish `ą`, French
+  `@`, Turkish `î`. Hold it and the keys show what they'll type.
 - **Predictive text.** A row of tappable suggestions above the keys. It learns
   what *you* type, and `handheld-kbd-build-dict` adds corpus frequencies so it's
   useful from the first keypress. Tapping a suggestion types it as real keys, so
@@ -147,6 +152,38 @@ vocabulary, stays on the device, and is in `.gitignore` for a reason.
 
 Turn learning off with `"predict_learn": false` (corpus only), or prediction entirely
 with `"prediction": false`.
+
+## Languages
+
+```bash
+handheld-kbd-locales                # what's configured, and what labels exist
+handheld-kbd-locales add it vn      # Italian and Vietnamese
+handheld-kbd-locales set us ru      # replace the list
+```
+
+Then log out and back in — KDE reads its layout list at session start — and 🌐 cycles
+through them.
+
+Worth knowing how this works, because it explains what it can and can't do. The keyboard
+injects real keycodes, exactly like a USB keyboard; **what a key types is decided by the
+OS layout**, not by this program. So a locale file here contains no behaviour at all, only
+the labels to paint on the keys. They're generated from
+[xkeyboard-config](https://gitlab.freedesktop.org/xkeyboard-config/xkeyboard-config) — the
+same data the OS uses — by `tools/build-locales.py`, rather than typed out by hand in
+scripts most of us can't proofread.
+
+Two consequences:
+
+- **A layout with no labels still works.** It types correctly; the keys are just drawn
+  with US captions. Any of the hundreds of layouts KDE offers can be added.
+- **Chinese, Japanese and Korean aren't here, and can't be.** Those are input methods, not
+  keyboard layouts — no mapping of keycodes to characters produces them. Use Fcitx or
+  IBus; this keyboard's keystrokes reach it like any other keyboard's.
+
+Vietnamese is a halfway case worth calling out. The `vn` layout puts `ă â ê ô ơ ư đ` on
+the number row and tone marks on `5`–`9`, which costs you the digits and can't produce
+every syllable. Most Vietnamese typing is done with an IME (Telex or VNI) on a US layout
+instead — that works here too, and is probably what you want.
 
 ## Configure
 

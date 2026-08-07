@@ -692,12 +692,28 @@ class OSK(Gtk.Window):
     def apply_locale(self, code):
         """Re-skin key labels to match the active XKB layout."""
         self.locale = code
-        lmap = load_locale_map(code)
-        for (b, name, base_label, base_shifted) in self.keybtns:
-            ov = lmap.get(name, {})
-            self._set_label(b, ov.get("label", base_label), ov.get("shifted", base_shifted))
+        self.lmap = load_locale_map(code)
+        self._relabel()
         if self.locale_btn:
             self._set_label(self.locale_btn, "🌐" + code.upper(), "")
+
+    def _relabel(self):
+        """Paint the keys for the current layout and modifier state.
+
+        With AltGr held the keys show their third level instead of their first. Printing
+        all three at once was the alternative, and on a 7-inch panel three glyphs per key
+        is unreadable — and most layouts have an AltGr symbol on nearly every key. Showing
+        the level you are actually about to type is both clearer and smaller.
+        """
+        lmap = getattr(self, "lmap", {}) or {}
+        alt_held = e.KEY_RIGHTALT in self.mods
+        for (b, name, base_label, base_shifted) in self.keybtns:
+            ov = lmap.get(name, {})
+            if alt_held and ov.get("alt"):
+                self._set_label(b, ov["alt"], "")
+            else:
+                self._set_label(b, ov.get("label", base_label),
+                                ov.get("shifted", base_shifted))
 
     def on_locale(self, btn):
         if self._stray_tap():
@@ -1242,6 +1258,8 @@ class OSK(Gtk.Window):
         if kc in self.mods: del self.mods[kc]
         else: self.mods[kc] = True
         self._refresh_mods()
+        if kc == e.KEY_RIGHTALT:
+            self._relabel()
 
     def _stray_tap(self):
         """True just after a swipe ends: GTK may still deliver a click for the key the
@@ -1259,7 +1277,10 @@ class OSK(Gtk.Window):
         self.ui.write(e.EV_KEY, kc, 0); self.ui.syn(); time.sleep(s)
         for m in reversed(mods): self.ui.write(e.EV_KEY, m, 0)
         if mods: self.ui.syn()
+        had_alt = e.KEY_RIGHTALT in mods
         self.mods.clear(); self._refresh_mods()
+        if had_alt:
+            self._relabel()          # the third level is spent; go back to showing the first
         self._track(kc, mods)
 
     def dismiss(self):

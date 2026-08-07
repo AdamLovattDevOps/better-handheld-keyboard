@@ -43,6 +43,7 @@ install -m755 "$HERE/bin/handheld-kbd-dock-rect" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-install-filter" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-toggle" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-ctl" "$BIN/"
+install -m755 "$HERE/bin/handheld-kbd-locales" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-fix-pointer" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-build-dict" "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-focus-probe" "$BIN/"
@@ -70,6 +71,10 @@ import json, os, shutil, sys
 
 SRC, DST = sys.argv[1], sys.argv[2]
 ACTION_KINDS = {"locale", "hide", "size", "opacity", "move"}
+# Ordinary keys a release added. Without AltGr most non-English layouts cannot type
+# their own characters at all, so an upgraded layout that lacks it is missing the
+# feature entirely rather than just a convenience.
+NEW_KEYS = {"KEY_RIGHTALT"}
 RETIRED = ("dock", "dock_edges")          # v1.0.3's docking slots, replaced by unlock/drag
 
 def load(p):
@@ -95,17 +100,21 @@ for name in sorted(os.listdir(os.path.join(SRC, "layouts"))):
         print(f"handheld-kbd: skipping {name} ({ex})", file=sys.stderr)
         continue
     have = {k.get("kind") for row in mine.get("rows", []) for k in row}
+    have_keys = {k.get("key") for row in mine.get("rows", []) for k in row}
     added = []
     for ri, row in enumerate(shipped.get("rows", [])):
         for ki, key in enumerate(row):
-            kind = key.get("kind")
-            if kind not in ACTION_KINDS or kind in have:
+            kind, kname = key.get("kind"), key.get("key")
+            action = kind in ACTION_KINDS and kind not in have
+            plain = kname in NEW_KEYS and kname not in have_keys
+            if not action and not plain:
                 continue
             # same row if the layout still has one, else the first row; same offset if it fits
             target = mine["rows"][ri] if ri < len(mine.get("rows", [])) else mine["rows"][0]
             target.insert(min(ki, len(target)), dict(key))
             have.add(kind)
-            added.append(key.get("label") or kind)
+            have_keys.add(kname)
+            added.append(key.get("label") or kind or kname)
     if added:
         shutil.copy(dp, dp + ".bak")
         save(dp, mine)
@@ -123,8 +132,13 @@ try:
 except Exception as ex:
     print(f"handheld-kbd: config tidy skipped ({ex})", file=sys.stderr)
 PY
+# Locale files are labels, not settings — they are generated from xkeyboard-config and
+# gain keys as layouts are added, so an old copy means a keyboard drawn with the wrong
+# captions. Refresh them, keeping a .bak of anything the user had actually changed.
 for f in "$HERE"/config/locales/*.json; do
-  d="$CFG/locales/$(basename "$f")"; [ -f "$d" ] || install -m644 "$f" "$d"
+  d="$CFG/locales/$(basename "$f")"
+  if [ -f "$d" ] && ! cmp -s "$f" "$d"; then cp "$d" "$d.bak"; fi
+  install -m644 "$f" "$d"
 done
 
 # --- on a fresh install, auto-pick the trigger mode for this device ---

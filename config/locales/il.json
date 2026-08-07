@@ -1,0 +1,225 @@
+{
+  "KEY_0": {
+    "alt": "‏",
+    "label": "0",
+    "shifted": "("
+  },
+  "KEY_1": {
+    "label": "1",
+    "shifted": "!"
+  },
+  "KEY_2": {
+    "label": "2",
+    "shifted": "@"
+  },
+  "KEY_3": {
+    "alt": "€",
+    "label": "3",
+    "shifted": "#"
+  },
+  "KEY_4": {
+    "alt": "₪",
+    "label": "4",
+    "shifted": "$"
+  },
+  "KEY_5": {
+    "alt": "°",
+    "label": "5",
+    "shifted": "%"
+  },
+  "KEY_6": {
+    "alt": "֫",
+    "label": "6",
+    "shifted": "^"
+  },
+  "KEY_7": {
+    "alt": "ֽ",
+    "label": "7",
+    "shifted": "&"
+  },
+  "KEY_8": {
+    "alt": "×",
+    "label": "8",
+    "shifted": "*"
+  },
+  "KEY_9": {
+    "alt": "‎",
+    "label": "9",
+    "shifted": ")"
+  },
+  "KEY_A": {
+    "alt": "ְ",
+    "label": "ש",
+    "shifted": "A"
+  },
+  "KEY_APOSTROPHE": {
+    "alt": "״",
+    "label": ",",
+    "shifted": "\""
+  },
+  "KEY_B": {
+    "label": "נ",
+    "shifted": "B"
+  },
+  "KEY_BACKSLASH": {
+    "alt": "ֻ",
+    "label": "\\",
+    "shifted": "|"
+  },
+  "KEY_C": {
+    "alt": "ֱ",
+    "label": "ב",
+    "shifted": "C"
+  },
+  "KEY_COMMA": {
+    "alt": "’",
+    "label": "ת",
+    "shifted": ">"
+  },
+  "KEY_D": {
+    "label": "ג",
+    "shifted": "D"
+  },
+  "KEY_DOT": {
+    "alt": "‚",
+    "label": "ץ",
+    "shifted": "<"
+  },
+  "KEY_E": {
+    "alt": "ָ",
+    "label": "ק",
+    "shifted": "E"
+  },
+  "KEY_EQUAL": {
+    "alt": "–",
+    "label": "=",
+    "shifted": "+"
+  },
+  "KEY_F": {
+    "label": "כ",
+    "shifted": "F"
+  },
+  "KEY_G": {
+    "alt": "ױ",
+    "label": "ע",
+    "shifted": "G"
+  },
+  "KEY_GRAVE": {
+    "alt": "׳",
+    "label": ";",
+    "shifted": "~"
+  },
+  "KEY_H": {
+    "alt": "ײ",
+    "label": "י",
+    "shifted": "H"
+  },
+  "KEY_I": {
+    "label": "ן",
+    "shifted": "I"
+  },
+  "KEY_J": {
+    "alt": "ִ",
+    "label": "ח",
+    "shifted": "J"
+  },
+  "KEY_K": {
+    "label": "ל",
+    "shifted": "K"
+  },
+  "KEY_L": {
+    "alt": "”",
+    "label": "ך",
+    "shifted": "L"
+  },
+  "KEY_LEFTBRACE": {
+    "alt": "ֲ",
+    "label": "]",
+    "shifted": "}"
+  },
+  "KEY_M": {
+    "alt": "ֵ",
+    "label": "צ",
+    "shifted": "M"
+  },
+  "KEY_MINUS": {
+    "alt": "־",
+    "label": "-",
+    "shifted": "_"
+  },
+  "KEY_N": {
+    "label": "מ",
+    "shifted": "N"
+  },
+  "KEY_O": {
+    "label": "ם",
+    "shifted": "O"
+  },
+  "KEY_P": {
+    "alt": "ַ",
+    "label": "פ",
+    "shifted": "P"
+  },
+  "KEY_Q": {
+    "alt": "ׂ",
+    "label": "/",
+    "shifted": "Q"
+  },
+  "KEY_R": {
+    "alt": "ֳ",
+    "label": "ר",
+    "shifted": "R"
+  },
+  "KEY_RIGHTBRACE": {
+    "alt": "ֿ",
+    "label": "[",
+    "shifted": "{"
+  },
+  "KEY_S": {
+    "alt": "ּ",
+    "label": "ד",
+    "shifted": "S"
+  },
+  "KEY_SEMICOLON": {
+    "alt": "„",
+    "label": "ף",
+    "shifted": ":"
+  },
+  "KEY_SLASH": {
+    "alt": "÷",
+    "label": ".",
+    "shifted": "?"
+  },
+  "KEY_T": {
+    "label": "א",
+    "shifted": "T"
+  },
+  "KEY_U": {
+    "alt": "ֹ",
+    "label": "ו",
+    "shifted": "U"
+  },
+  "KEY_V": {
+    "label": "ה",
+    "shifted": "V"
+  },
+  "KEY_W": {
+    "alt": "ׁ",
+    "label": "'",
+    "shifted": "W"
+  },
+  "KEY_X": {
+    "alt": "ֶ",
+    "label": "ס",
+    "shifted": "X"
+  },
+  "KEY_Y": {
+    "alt": "װ",
+    "label": "ט",
+    "shifted": "Y"
+  },
+  "KEY_Z": {
+    "label": "ז",
+    "shifted": "Z"
+  }
+}
