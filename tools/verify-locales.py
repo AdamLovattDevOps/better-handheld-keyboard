@@ -97,6 +97,15 @@ def main():
         ours = json.load(open(os.path.join(LOCALES, f"{code}.json")))
         theirs = keymap_levels(text)
         bad = []
+        # A level-3 label is a promise the layout may not keep: it can define symbols on
+        # the third level and bind no key to reach them. Russian did — the rouble sat on
+        # a key no keypress could produce.
+        ralt = re.search(r"key <RALT>.*?\};", text, re.S)
+        if ralt and "ISO_Level3_Shift" not in ralt.group(0):
+            unreachable = [k for k, v in ours.items() if "alt" in v]
+            if unreachable:
+                bad.append(f"{len(unreachable)} AltGr label(s) but this layout has no "
+                           f"level-3 switch: {', '.join(sorted(unreachable)[:4])}…")
         # A short locale file is how every parser bug so far presented: the layout looked
         # right and had quietly lost keys off the end.
         expected = len(XKB_TO_EVDEV)
