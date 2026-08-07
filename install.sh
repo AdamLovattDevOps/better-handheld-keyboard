@@ -33,6 +33,45 @@ fi
 
 mkdir -p "$BIN" "$CFG/layouts" "$CFG/locales" "$KWIN/contents/code" "$AUTO"
 
+# --- the one privileged step: let it reach /dev/uinput ---
+# Done FIRST, and only when actually needed.
+#
+# It asks for a password, and on a handheld the only way to type one may be the very
+# keyboard this script is replacing. Running it last meant the prompt could arrive after
+# the keyboard had gone, with no way to answer it. Running it first keeps whatever
+# keyboard you started with alive to type into.
+#
+# On an upgrade none of this is needed: the udev rule and the group membership are
+# already there from last time, so the prompt should never appear at all.
+RULE=/etc/udev/rules.d/60-handheld-kbd.rules
+ensure_privilege() {
+  if [ -f "$RULE" ] && { id -nG | tr ' ' '\n' | grep -qx input || [ -w /dev/uinput ]; }; then
+    PRIV_OK=1
+    say "Keyboard-injection permission already in place — no password needed."
+    return
+  fi
+  say "Setting up keyboard-injection permission (you'll be asked for your password once)…"
+  say "   Doing this first, while you still have a keyboard to type it with."
+  PRIV='
+cat > /etc/udev/rules.d/60-handheld-kbd.rules <<EOF
+KERNEL=="uinput", MODE="0660", GROUP="input", OPTIONS+="static_node=uinput"
+EOF
+getent group input >/dev/null || groupadd input
+usermod -aG input "'"$USER"'"
+udevadm control --reload && udevadm trigger /dev/uinput 2>/dev/null
+'
+  if command -v pkexec >/dev/null 2>&1; then
+    pkexec sh -c "$PRIV" && PRIV_OK=1 || PRIV_OK=0
+  else
+    PRIV_OK=0
+  fi
+  if [ "$PRIV_OK" != 1 ]; then
+    warn "Couldn't get permission. Run this once in a terminal, then re-run the installer:"
+    echo "     sudo sh -c '$PRIV'"
+  fi
+}
+ensure_privilege
+
 # --- programs ---
 install -m755 "$HERE/bin/handheld-kbd.py"        "$BIN/"
 install -m755 "$HERE/bin/handheld-kbd-swap.sh"   "$BIN/"
@@ -262,21 +301,8 @@ if command -v kwriteconfig6 >/dev/null 2>&1; then
   qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
 fi
 
-# --- the one privileged step: let it reach /dev/uinput (single auth prompt) ---
-say "Setting up keyboard-injection permission (you'll be asked for your password once)…"
-PRIV='
-cat > /etc/udev/rules.d/60-handheld-kbd.rules <<EOF
-KERNEL=="uinput", MODE="0660", GROUP="input", OPTIONS+="static_node=uinput"
-EOF
-getent group input >/dev/null || groupadd input
-usermod -aG input "'"$USER"'"
-udevadm control --reload && udevadm trigger /dev/uinput 2>/dev/null
-'
-if command -v pkexec >/dev/null 2>&1; then
-  pkexec sh -c "$PRIV" && PRIV_OK=1 || PRIV_OK=0
-else
-  warn "pkexec not found — run this once yourself:  sudo sh -c '$PRIV'"; PRIV_OK=0
-fi
+# The privileged step now happens near the top, before anything is touched — see
+# ensure_privilege().
 
 # --- dependency check ---
 MISSING=""
@@ -338,4 +364,7 @@ fi
 
 echo
 say "Rebuild the prediction dictionary any time with: handheld-kbd-build-dict"
-[ "${PRIV_OK:-0}" = 1 ] || warn "Permission step didn't complete — typing won't work until it does."
+if [ "${PRIV_OK:-0}" != 1 ]; then
+  warn "Typing won't work until the permission step completes — see the command above."
+  warn "You still have your old keyboard: 'handheld-kbd-recover' puts Steam's back."
+fi

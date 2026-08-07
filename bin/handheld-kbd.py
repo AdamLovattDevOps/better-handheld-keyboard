@@ -148,6 +148,30 @@ def load_layout(name):
         return dict(DEFAULT_LAYOUT)
 
 
+_locale_index = None
+
+
+def locale_badge(code):
+    """What the 🌐 key shows for a layout.
+
+    Not the xkb code: "il" is Israel rather than Hebrew, "in" is India rather than Hindi,
+    and "us" and "gb" are both English — none of which tells you what you are about to
+    type. The index carries a short badge per language, in its own script where that says
+    more than two Latin letters would.
+    """
+    global _locale_index
+    if _locale_index is None:
+        try:
+            with open(os.path.join(CFG_DIR, "locales", "index.json")) as f:
+                _locale_index = json.load(f)
+        except Exception:
+            _locale_index = {}
+    entry = _locale_index.get(code)
+    if isinstance(entry, dict) and entry.get("badge"):
+        return entry["badge"]
+    return code.upper()
+
+
 def load_locale_map(code):
     try:
         with open(os.path.join(CFG_DIR, "locales", f"{code}.json")) as f:
@@ -728,7 +752,7 @@ class OSK(Gtk.Window):
         self.lmap = load_locale_map(code)
         self._relabel()
         if self.locale_btn:
-            self._set_label(self.locale_btn, "🌐" + code.upper(), "")
+            self._set_label(self.locale_btn, "🌐" + locale_badge(code), "")
 
     def _relabel(self):
         """Paint the keys for the current layout and modifier state.

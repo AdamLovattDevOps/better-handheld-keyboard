@@ -11,6 +11,7 @@ Usage: kate-type.py <code> [<code>…]
 """
 import json
 import os
+import unicodedata
 import subprocess
 import sys
 import time
@@ -43,6 +44,20 @@ SENTENCES = {
     "th":    "เป็นมนุษย์สุดประเสริฐเลิศคุณค่า",
     "vn":    "Do bạch kim rất quý nên sẽ dùng để lắp vô xe",
 }
+
+
+def currency_for(cmap):
+    """Every currency symbol this layout can reach, cheapest test of AltGr there is.
+
+    Most layouts keep their currency on the third level — € on AltGr-E, ₺ on AltGr-T —
+    so typing them exercises the AltGr key and the level-3 labels together, in the one
+    place a user is most likely to notice being wrong.
+    """
+    out = []
+    for ch, (kc, mods) in cmap.items():
+        if len(ch) == 1 and unicodedata.category(ch) == "Sc":
+            out.append(ch)
+    return sorted(out)
 
 
 def char_map(code):
@@ -124,11 +139,13 @@ def press(ui, kc, mods=()):
 
 
 def run_one(code, ui):
-    sentence = SENTENCES[code]
     try:
         cmap = char_map(code)
     except Exception as ex:
         return f"SKIP  no locale data ({ex})"
+    # The pangram exercises the alphabet; the currency symbols exercise AltGr.
+    money = currency_for(cmap)
+    sentence = SENTENCES[code] + ((" " + " ".join(money)) if money else "")
     if not switch_to(code):
         return "SKIP  KDE would not switch to this layout"
 

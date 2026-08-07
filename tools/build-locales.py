@@ -38,27 +38,32 @@ KEYSYMDEF = ("https://gitlab.freedesktop.org/xorg/proto/xorgproto"
 # Deliberately absent: Chinese, Japanese and Korean. Those are not keyboard layouts but
 # input methods; no mapping of keycodes to characters can produce them, and pretending
 # otherwise with a labelled keyboard would be a lie about what pressing the key does.
+# (xkb code, language name, key badge). The badge is what the 🌐 key shows, so it has to
+# say something on a key the width of a thumb. The xkb code will not do: "il" is Israel
+# not Hebrew, "in" is India not Hindi, "us" and "gb" are both English. Latin layouts keep
+# the familiar two letters; the rest get their own script, which is self-evident to
+# anyone who reads it and a decent hint to anyone who does not.
 LAYOUTS = [
-    ("us",    "English (US)"),
-    ("gb",    "English (UK)"),
-    ("de",    "German"),
-    ("fr",    "French"),
-    ("es",    "Spanish"),
-    ("latam", "Spanish (Latin America)"),
-    ("it",    "Italian"),
-    ("pt",    "Portuguese"),
-    ("br",    "Portuguese (Brazil)"),
-    ("nl",    "Dutch"),
-    ("pl",    "Polish"),
-    ("tr",    "Turkish"),
-    ("ru",    "Russian"),
-    ("ua",    "Ukrainian"),
-    ("gr",    "Greek"),
-    ("ara",   "Arabic"),
-    ("il",    "Hebrew"),
-    ("in",    "Hindi (Devanagari)"),
-    ("th",    "Thai"),
-    ("vn",    "Vietnamese"),
+    ("us",    "English (US)",            "US"),
+    ("gb",    "English (UK)",            "UK"),
+    ("de",    "German",                  "DE"),
+    ("fr",    "French",                  "FR"),
+    ("es",    "Spanish",                 "ES"),
+    ("latam", "Spanish (Latin America)", "LA"),
+    ("it",    "Italian",                 "IT"),
+    ("pt",    "Portuguese",              "PT"),
+    ("br",    "Portuguese (Brazil)",     "BR"),
+    ("nl",    "Dutch",                   "NL"),
+    ("pl",    "Polish",                  "PL"),
+    ("tr",    "Turkish",                 "TR"),
+    ("ru",    "Russian",                 "РУ"),
+    ("ua",    "Ukrainian",               "УК"),
+    ("gr",    "Greek",                   "ΕΛ"),
+    ("ara",   "Arabic",                  "ع"),
+    ("il",    "Hebrew",                  "עב"),
+    ("in",    "Hindi (Devanagari)",      "हि"),
+    ("th",    "Thai",                    "ไทย"),
+    ("vn",    "Vietnamese",              "VI"),
 ]
 
 # XKB's key names for the keys this keyboard actually has. Anything else in a symbol
@@ -323,7 +328,7 @@ def main():
     syms = Symbols(symdir, args.fetch)
     os.makedirs(OUT, exist_ok=True)
     index = {}
-    for code, name in LAYOUTS:
+    for code, name, badge in LAYOUTS:
         data = build(code, syms, table)
         if len(data) < 20:
             print(f"  ! {code}: only {len(data)} keys resolved — not written",
@@ -332,7 +337,7 @@ def main():
         with open(os.path.join(OUT, f"{code}.json"), "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False, sort_keys=True)
             f.write("\n")
-        index[code] = name
+        index[code] = {"name": name, "badge": badge}
         alt = sum(1 for v in data.values() if "alt" in v)
         print(f"  {code:6s} {len(data):3d} keys, {alt:3d} with AltGr  — {name}")
 
