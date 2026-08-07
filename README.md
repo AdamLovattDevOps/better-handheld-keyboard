@@ -169,6 +169,17 @@ handheld-kbd-locales set us gb it ru
 Then log out and back in — KDE reads its layout list at session start — and 🌐 cycles
 through them.
 
+Check what this machine can actually manage:
+
+```bash
+handheld-kbd-locales --check
+```
+
+Shipping labels for twenty languages doesn't make twenty languages work — the layout
+comes from `xkeyboard-config` and the glyphs from your system fonts. `--check` reports
+both per language, and the installer runs it for you. A missing font means the keys type
+correctly but draw as empty boxes; install the Noto font for that script.
+
 **Keep one Latin layout among your four.** Application shortcuts are bound to Latin
 keysyms, so with only non-Latin layouts loaded the S key produces (say) `Cyrillic_yeru`
 and `Ctrl+S` never reaches Save — likewise `Ctrl+C`, `Ctrl+V`. KDE's Latin fallback

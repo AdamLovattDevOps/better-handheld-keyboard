@@ -320,5 +320,22 @@ else
 fi
 
 echo
+# --- can this machine actually use the languages we just installed? ---
+# Shipping labels for twenty languages does not make twenty languages work. The layout
+# comes from xkeyboard-config and the glyphs from the system fonts, and a machine missing
+# either gets a keyboard that draws boxes or types the wrong thing. Say so at install
+# time rather than letting it be discovered.
+if [ -x "$BIN/handheld-kbd-locales" ]; then
+  if "$BIN/handheld-kbd-locales" --check >/tmp/handheld-kbd-locale-check.txt 2>&1; then
+    say "All 20 languages can be typed and drawn on this machine."
+  else
+    warn "Some languages need something this machine doesn't have:"
+    grep -vE '^\s*$' /tmp/handheld-kbd-locale-check.txt | grep -iE 'MISSING|no font|need' | head -12
+    echo "   Full report: handheld-kbd-locales --check"
+  fi
+  echo "   Pick which four are live:  handheld-kbd-locales --gui   (or the tray icon)"
+fi
+
+echo
 say "Rebuild the prediction dictionary any time with: handheld-kbd-build-dict"
 [ "${PRIV_OK:-0}" = 1 ] || warn "Permission step didn't complete — typing won't work until it does."
