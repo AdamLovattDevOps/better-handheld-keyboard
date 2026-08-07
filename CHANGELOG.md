@@ -116,6 +116,16 @@ fails the test — in scripts nobody here can proofread. `tools/kate-type.py`.
 All twenty pass. Spanish, Greek and Vietnamese type everything except the characters
 needing dead-key or combining composition, as expected.
 
+### Added: `handheld-kbd-locales --check`
+
+Shipping labels for twenty languages does not make twenty languages work. The layout
+comes from xkeyboard-config and the glyphs from the system fonts, and a machine missing
+either draws boxes or types the wrong thing. `--check` reports both per language, and the
+installer runs it so you learn at install time rather than by discovery. Font coverage is
+probed once per script through fontconfig, not guessed. Verified on a Legion Go 2: all
+twenty layouts present, all scripts drawable — Arabic and Hebrew via DejaVu, Devanagari
+and Thai via Noto.
+
 ### Known: keep one Latin layout among your four
 
 Application shortcuts are bound to Latin keysyms. With only non-Latin layouts loaded the

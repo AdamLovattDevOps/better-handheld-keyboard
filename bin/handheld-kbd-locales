@@ -10,6 +10,8 @@ This edits KDE's layout list for you, and reports which of them this keyboard ha
 labels for.
 
     handheld-kbd-locales                list what is configured, and what is available
+    handheld-kbd-locales --check        can this machine type and draw each language?
+    handheld-kbd-locales --gui          pick languages in a dialog
     handheld-kbd-locales add it vn      add Italian and Vietnamese
     handheld-kbd-locales remove vn      remove Vietnamese
     handheld-kbd-locales set us it ru   replace the list outright
@@ -25,6 +27,7 @@ import json
 import os
 import subprocess
 import sys
+import unicodedata
 
 CFG_DIR = os.path.expanduser("~/.config/handheld-kbd")
 SHIPPED = os.path.join(CFG_DIR, "locales")
@@ -45,7 +48,8 @@ MAX_LAYOUTS = 4
 # global shortcuts, not an application's own. Verified in Kate on a Legion Go 2 — with
 # only ru/ua/gr/ara loaded, every save silently did nothing.
 LATIN = {"us", "gb", "de", "fr", "es", "latam", "it", "pt", "br", "nl", "pl", "tr", "vn"}
-BOLD, DIM, GREEN, YELLOW, RESET = "\033[1m", "\033[2m", "\033[32m", "\033[33m", "\033[0m"
+BOLD, DIM, GREEN, YELLOW, RED, RESET = ("\033[1m", "\033[2m", "\033[32m",
+                                        "\033[33m", "\033[31m", "\033[0m")
 
 
 def available():
@@ -56,6 +60,104 @@ def available():
     except Exception:
         return {os.path.splitext(n)[0]: "" for n in sorted(os.listdir(SHIPPED))
                 if n.endswith(".json") and n != "index.json"}
+
+
+def xkb_layouts():
+    """XKB layout codes this OS can actually load, or None if we cannot tell.
+
+    Labels shipping for a language is not the same as the OS being able to type it: the
+    layout itself comes from xkeyboard-config, and asking KDE for one it does not have
+    gets you a keyboard that types US while drawing something else.
+    """
+    try:
+        out = subprocess.check_output(["localectl", "list-x11-keymap-layouts"],
+                                      text=True, timeout=10)
+        return {l.strip() for l in out.splitlines() if l.strip()}
+    except Exception:
+        pass
+    try:
+        return set(os.listdir("/usr/share/X11/xkb/symbols"))
+    except Exception:
+        return None
+
+
+_font_cache = {}
+
+
+def script_of(ch):
+    try:
+        return unicodedata.name(ch).split()[0]
+    except ValueError:
+        return "UNKNOWN"
+
+
+def font_for(ch):
+    """True if any installed font draws this character.
+
+    Without one the key is drawn as a tofu box — the layout types correctly and looks
+    broken, which is a worse failure than not offering it. Probed once per script rather
+    than per character: a font covering Thai covers Thai.
+    """
+    key = script_of(ch)
+    if key in _font_cache:
+        return _font_cache[key]
+    try:
+        out = subprocess.check_output(["fc-list", f":charset={ord(ch):04x}"],
+                                      text=True, timeout=10)
+        ok = bool(out.strip())
+    except Exception:
+        ok = True                    # no fontconfig to ask: do not cry wolf
+    _font_cache[key] = ok
+    return ok
+
+
+def check(codes=None):
+    """Report, per language, whether this machine can type it and draw it."""
+    avail = available()
+    layouts = xkb_layouts()
+    codes = codes or sorted(avail)
+    problems = 0
+    print(f"{BOLD}{'code':7s}{'layout':10s}{'fonts':28s}language{RESET}")
+    for code in codes:
+        try:
+            with open(os.path.join(SHIPPED, f"{code}.json")) as f:
+                data = json.load(f)
+        except Exception:
+            print(f"  {code:6s} {YELLOW}no labels installed{RESET}")
+            problems += 1
+            continue
+
+        if layouts is None:
+            lay = f"{DIM}unknown{RESET}"
+        elif code in layouts:
+            lay = f"{GREEN}ok{RESET}     "
+        else:
+            lay = f"{RED}MISSING{RESET}"
+            problems += 1
+
+        missing = {}
+        for entry in data.values():
+            for field in ("label", "shifted", "alt"):
+                for ch in entry.get(field) or "":
+                    if ord(ch) > 0x7F and not font_for(ch):
+                        missing.setdefault(script_of(ch), ch)
+        if missing:
+            fonts = f"{RED}no font: {', '.join(sorted(missing))}{RESET}"
+            problems += 1
+        else:
+            fonts = f"{GREEN}ok{RESET}"
+        pad = " " * max(0, 20 - len(", ".join(sorted(missing))) if missing else 18)
+        print(f"  {code:6s} {lay}  {fonts}{pad}{avail.get(code, '')}")
+
+    if problems:
+        print(f"\n{YELLOW}!!{RESET} {problems} language(s) need something this machine"
+              f" does not have.\n"
+              f"   Missing layout  → install xkeyboard-config (it is normally already there).\n"
+              f"   Missing font    → install the Noto font for that script; until then the\n"
+              f"                     keys type correctly but draw as empty boxes.")
+    else:
+        print(f"\n{GREEN}::{RESET} every shipped language can be typed and drawn here.")
+    return 1 if problems else 0
 
 
 def kread(key, default=""):
@@ -199,6 +301,8 @@ def main():
         return 0
     if argv[0] == "--gui":
         return gui()
+    if argv[0] in ("--check", "check"):
+        return check(argv[1:] or None)
     cmd, codes = argv[0], [c.strip().lower() for c in argv[1:] if c.strip()]
     if cmd in ("-h", "--help", "help"):
         print(__doc__)
