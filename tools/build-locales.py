@@ -236,6 +236,29 @@ class Symbols:
                 best = body
         return best or ""
 
+    def has_level3(self, name, variant=None, seen=None):
+        """True if this layout gives you a way to REACH the third level.
+
+        A layout can define level-3 symbols and provide no key to shift to them. The
+        Russian layout does exactly that: the rouble sits on level 3 of the 8 key, and
+        nothing in the layout binds AltGr — RALT stays Alt_R. Drawing ₽ on the key would
+        promise a character no keypress can produce, which is the failure this whole
+        generator exists to avoid.
+        """
+        seen = seen if seen is not None else set()
+        key = (name, variant)
+        if key in seen:
+            return False
+        seen.add(key)
+        body = self.block(name, variant)
+        if "level3(" in body or "level5(" in body:
+            return True
+        for inc in _INCLUDE_RE.findall(body):
+            m = re.fullmatch(r"([\w+/-]+)(?:\(([\w-]+)\))?", inc.strip())
+            if m and self.has_level3(m.group(1), m.group(2), seen):
+                return True
+        return False
+
     def levels(self, name, variant=None, seen=None):
         """{xkb key name: [level1, level2, level3, ...]} with includes merged in first."""
         seen = seen if seen is not None else set()
@@ -277,6 +300,7 @@ class Symbols:
 
 def build(code, syms, table):
     levels = syms.levels(code)
+    altgr = syms.has_level3(code)
     out = {}
     for xkbname, entry in levels.items():
         evdev = XKB_TO_EVDEV.get(xkbname)
@@ -293,7 +317,7 @@ def build(code, syms, table):
         # printing it in the corner of the key is noise.
         if shifted and shifted != label and shifted != label.upper():
             rec["shifted"] = shifted
-        if alt and alt not in (label, shifted):
+        if altgr and alt and alt not in (label, shifted):
             rec["alt"] = alt
         out[evdev] = rec
     return out
@@ -339,7 +363,8 @@ def main():
             f.write("\n")
         index[code] = {"name": name, "badge": badge}
         alt = sum(1 for v in data.values() if "alt" in v)
-        print(f"  {code:6s} {len(data):3d} keys, {alt:3d} with AltGr  — {name}")
+        note = "" if syms.has_level3(code) else "   (no AltGr switch in this layout)"
+        print(f"  {code:6s} {len(data):3d} keys, {alt:3d} with AltGr  — {name}{note}")
 
     with open(os.path.join(OUT, "index.json"), "w", encoding="utf-8") as f:
         json.dump(index, f, indent=2, ensure_ascii=False, sort_keys=True)

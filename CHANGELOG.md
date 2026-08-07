@@ -134,6 +134,18 @@ same way. KDE's Latin fallback covers global shortcuts, not an application's own
 by this test failing every save under `ru ua gr ara`, and passing the moment `us` was in
 the group. `handheld-kbd-locales` now warns when a selection has no Latin layout.
 
+### Fixed since rc10
+
+- **No key is labelled with a character it cannot type.** A layout can define symbols on
+  the third level and bind nothing to reach them, and Russian does exactly that: the
+  rouble sits on level 3 of the `8` key while `RALT` stays `Alt_R`, so `₽` was drawn on a
+  key no keypress could produce. Level-3 labels are now emitted only for layouts that
+  actually provide an AltGr switch — which drops them for `ru`, and confirms `us` and
+  `th` never had any. CI fails a locale that claims otherwise.
+
+  Found by the language test typing each layout's currency symbols: `₽` was the one
+  character out of twenty languages that went in and did not come back.
+
 ### Fixed since rc9
 
 - **Uninstalling actually uninstalls.** The removal list was written once and never kept
