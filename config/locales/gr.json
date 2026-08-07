@@ -71,6 +71,7 @@
     "label": "ψ"
   },
   "KEY_COMMA": {
+    "alt": "«",
     "label": ",",
     "shifted": "<"
   },
@@ -79,6 +80,7 @@
     "label": "δ"
   },
   "KEY_DOT": {
+    "alt": "»",
     "label": ".",
     "shifted": ">"
   },

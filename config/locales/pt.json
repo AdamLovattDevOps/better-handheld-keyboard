@@ -53,6 +53,11 @@
     "alt": "æ",
     "label": "a"
   },
+  "KEY_APOSTROPHE": {
+    "alt": "ˆ",
+    "label": "º",
+    "shifted": "ª"
+  },
   "KEY_B": {
     "alt": "“",
     "label": "b"
@@ -83,6 +88,11 @@
   "KEY_E": {
     "alt": "€",
     "label": "e"
+  },
+  "KEY_EQUAL": {
+    "alt": "¸",
+    "label": "«",
+    "shifted": "»"
   },
   "KEY_F": {
     "alt": "đ",
@@ -186,6 +196,7 @@
     "label": "w"
   },
   "KEY_X": {
+    "alt": "»",
     "label": "x"
   },
   "KEY_Y": {
@@ -193,6 +204,7 @@
     "label": "y"
   },
   "KEY_Z": {
+    "alt": "«",
     "label": "z"
   }
 }
