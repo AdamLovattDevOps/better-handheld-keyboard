@@ -1,0 +1,287 @@
+#!/usr/bin/env python3
+"""System tray icon: show/hide the keyboard, restart it, put it back.
+
+A separate process from the keyboard on purpose. The tray's whole job is to rescue a
+keyboard that is misbehaving, so it must not share a process with the thing it rescues —
+and clicking "Restart" would otherwise mean killing yourself mid-click.
+
+This talks the StatusNotifierItem protocol to Plasma directly over DBus, rather than
+through libappindicator. SteamOS is an immutable image with no pip and no appindicator
+package, so a dependency here is a dependency that cannot be installed.
+
+    handheld-kbd-tray            run it (normally started by autostart)
+"""
+import os
+import signal
+import subprocess
+import sys
+
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gio, GLib     # noqa: E402
+
+BIN = os.path.expanduser("~/.local/bin")
+APP_ID = f"handheld-kbd-tray-{os.getpid()}"
+BUS_NAME = f"org.kde.StatusNotifierItem-{os.getpid()}-1"
+ITEM_PATH = "/StatusNotifierItem"
+MENU_PATH = "/MenuBar"
+
+SNI_XML = """
+<node>
+  <interface name='org.kde.StatusNotifierItem'>
+    <property name='Category' type='s' access='read'/>
+    <property name='Id' type='s' access='read'/>
+    <property name='Title' type='s' access='read'/>
+    <property name='Status' type='s' access='read'/>
+    <property name='IconName' type='s' access='read'/>
+    <property name='ToolTip' type='(sa(iiay)ss)' access='read'/>
+    <property name='Menu' type='o' access='read'/>
+    <property name='ItemIsMenu' type='b' access='read'/>
+    <method name='Activate'>
+      <arg type='i' name='x' direction='in'/>
+      <arg type='i' name='y' direction='in'/>
+    </method>
+    <method name='SecondaryActivate'>
+      <arg type='i' name='x' direction='in'/>
+      <arg type='i' name='y' direction='in'/>
+    </method>
+    <method name='ContextMenu'>
+      <arg type='i' name='x' direction='in'/>
+      <arg type='i' name='y' direction='in'/>
+    </method>
+    <method name='Scroll'>
+      <arg type='i' name='delta' direction='in'/>
+      <arg type='s' name='orientation' direction='in'/>
+    </method>
+    <signal name='NewIcon'/>
+    <signal name='NewStatus'><arg type='s' name='status'/></signal>
+    <signal name='NewToolTip'/>
+  </interface>
+</node>
+"""
+
+# The menu half of the protocol. Plasma asks for the layout, we answer with a tree, and
+# it tells us which id was clicked.
+MENU_XML = """
+<node>
+  <interface name='com.canonical.dbusmenu'>
+    <property name='Version' type='u' access='read'/>
+    <property name='Status' type='s' access='read'/>
+    <property name='TextDirection' type='s' access='read'/>
+    <property name='IconThemePath' type='as' access='read'/>
+    <method name='GetLayout'>
+      <arg type='i' name='parentId' direction='in'/>
+      <arg type='i' name='recursionDepth' direction='in'/>
+      <arg type='as' name='propertyNames' direction='in'/>
+      <arg type='u' name='revision' direction='out'/>
+      <arg type='(ia{sv}av)' name='layout' direction='out'/>
+    </method>
+    <method name='GetGroupProperties'>
+      <arg type='ai' name='ids' direction='in'/>
+      <arg type='as' name='propertyNames' direction='in'/>
+      <arg type='a(ia{sv})' name='properties' direction='out'/>
+    </method>
+    <method name='GetProperty'>
+      <arg type='i' name='id' direction='in'/>
+      <arg type='s' name='name' direction='in'/>
+      <arg type='v' name='value' direction='out'/>
+    </method>
+    <method name='Event'>
+      <arg type='i' name='id' direction='in'/>
+      <arg type='s' name='eventId' direction='in'/>
+      <arg type='v' name='data' direction='in'/>
+      <arg type='u' name='timestamp' direction='in'/>
+    </method>
+    <method name='AboutToShow'>
+      <arg type='i' name='id' direction='in'/>
+      <arg type='b' name='needUpdate' direction='out'/>
+    </method>
+    <signal name='LayoutUpdated'>
+      <arg type='u' name='revision'/>
+      <arg type='i' name='parent'/>
+    </signal>
+  </interface>
+</node>
+"""
+
+
+def run(*args):
+    """Fire and forget: a tray click must never block the panel waiting for us."""
+    try:
+        subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+    except Exception as ex:
+        print(f"handheld-kbd-tray: {args[0]} failed ({ex})", file=sys.stderr)
+
+
+def kbd_running():
+    return subprocess.run(["pgrep", "-f", r"python3 .*handheld-kbd\.py"],
+                          stdout=subprocess.DEVNULL).returncode == 0
+
+
+def kbd_shown():
+    try:
+        with open("/tmp/handheld-kbd.vis") as f:
+            return f.read().strip() == "1"
+    except Exception:
+        return False
+
+
+class Tray:
+    # id: (label, icon, action). 0 is the root, which dbusmenu reserves.
+    ACTIONS = {
+        1: ("Show keyboard",         "input-keyboard",  lambda: run(f"{BIN}/handheld-kbd-toggle")),
+        3: ("Restart keyboard",      "view-refresh",    lambda: run(f"{BIN}/handheld-kbd-ctl", "restart")),
+        4: ("Reset position",        "go-bottom",       lambda: run(f"{BIN}/handheld-kbd-ctl", "reset")),
+        5: ("Fix trackpad pointer",  "input-touchpad",  lambda: run(f"{BIN}/handheld-kbd-fix-pointer")),
+        7: ("Stop keyboard",         "process-stop",    lambda: run(f"{BIN}/handheld-kbd-ctl", "stop")),
+    }
+    SEPARATORS = (2, 6)
+
+    def __init__(self):
+        self.bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        self.revision = 1
+
+    # ---- menu model ----
+
+    def label(self, item_id):
+        text = self.ACTIONS[item_id][0]
+        if item_id == 1:
+            # One entry, not two: "Hide" on a hidden keyboard is a dead option, and a
+            # tray menu is read at a glance.
+            return "Hide keyboard" if kbd_shown() else "Show keyboard"
+        if item_id == 7 and not kbd_running():
+            return "Start keyboard"
+        return text
+
+    def props(self, item_id):
+        if item_id in self.SEPARATORS:
+            return {"type": GLib.Variant("s", "separator")}
+        label, icon, _ = self.ACTIONS[item_id]
+        return {
+            "label": GLib.Variant("s", self.label(item_id)),
+            "icon-name": GLib.Variant("s", icon),
+            "enabled": GLib.Variant("b", True),
+            "visible": GLib.Variant("b", True),
+        }
+
+    def node(self, item_id):
+        return GLib.Variant("(ia{sv}av)", (item_id, self.props(item_id), []))
+
+    def layout(self):
+        kids = [self.node(i) for i in sorted(list(self.ACTIONS) + list(self.SEPARATORS))]
+        root = {"children-display": GLib.Variant("s", "submenu")}
+        return GLib.Variant("(ia{sv}av)", (0, root, kids))
+
+    # ---- dbus plumbing ----
+
+    def on_sni_call(self, conn, sender, path, iface, method, params, inv):
+        if method in ("Activate", "SecondaryActivate"):
+            run(f"{BIN}/handheld-kbd-toggle")
+        inv.return_value(None)
+
+    def on_sni_get(self, conn, sender, path, iface, prop):
+        return {
+            "Category": GLib.Variant("s", "SystemServices"),
+            "Id": GLib.Variant("s", "handheld-kbd"),
+            "Title": GLib.Variant("s", "Handheld Keyboard"),
+            "Status": GLib.Variant("s", "Active"),
+            "IconName": GLib.Variant("s", "input-keyboard"),
+            "ToolTip": GLib.Variant("(sa(iiay)ss)",
+                                    ("input-keyboard", [], "Handheld Keyboard",
+                                     "Tap to show or hide the keyboard")),
+            "Menu": GLib.Variant("o", MENU_PATH),
+            "ItemIsMenu": GLib.Variant("b", False),
+        }.get(prop)
+
+    def on_menu_call(self, conn, sender, path, iface, method, params, inv):
+        if method == "GetLayout":
+            inv.return_value(GLib.Variant.new_tuple(
+                GLib.Variant("u", self.revision), self.layout()))
+        elif method == "GetGroupProperties":
+            ids = params.unpack()[0]
+            wanted = ids or sorted(list(self.ACTIONS) + list(self.SEPARATORS))
+            inv.return_value(GLib.Variant("(a(ia{sv}))", ([
+                (i, self.props(i)) for i in wanted
+                if i in self.ACTIONS or i in self.SEPARATORS], )))
+        elif method == "GetProperty":
+            item_id, name = params.unpack()
+            value = self.props(item_id).get(name, GLib.Variant("s", ""))
+            inv.return_value(GLib.Variant.new_tuple(GLib.Variant("v", value)))
+        elif method == "Event":
+            item_id, event_id = params.unpack()[0], params.unpack()[1]
+            inv.return_value(None)
+            if event_id == "clicked" and item_id in self.ACTIONS:
+                self.ACTIONS[item_id][2]()
+                # State changes after every one of these, so the next open re-reads it.
+                GLib.timeout_add_seconds(1, self.refresh)
+            return
+        elif method == "AboutToShow":
+            # Labels depend on whether the keyboard is up and shown right now.
+            inv.return_value(GLib.Variant("(b)", (True,)))
+            self.refresh()
+            return
+        else:
+            inv.return_value(None)
+
+    def on_menu_get(self, conn, sender, path, iface, prop):
+        return {
+            "Version": GLib.Variant("u", 3),
+            "Status": GLib.Variant("s", "normal"),
+            "TextDirection": GLib.Variant("s", "ltr"),
+            "IconThemePath": GLib.Variant("as", []),
+        }.get(prop)
+
+    def refresh(self):
+        self.revision += 1
+        try:
+            self.bus.emit_signal(None, MENU_PATH, "com.canonical.dbusmenu",
+                                 "LayoutUpdated",
+                                 GLib.Variant("(ui)", (self.revision, 0)))
+        except Exception:
+            pass
+        return False
+
+    def register(self):
+        for path, xml, call, get in (
+                (ITEM_PATH, SNI_XML, self.on_sni_call, self.on_sni_get),
+                (MENU_PATH, MENU_XML, self.on_menu_call, self.on_menu_get)):
+            node = Gio.DBusNodeInfo.new_for_xml(xml)
+            self.bus.register_object(path, node.interfaces[0], call, get, None)
+
+    def announce(self):
+        """Tell Plasma we exist. The watcher may not be up yet at login, so keep trying."""
+        try:
+            self.bus.call_sync(
+                "org.kde.StatusNotifierWatcher", "/StatusNotifierWatcher",
+                "org.kde.StatusNotifierWatcher", "RegisterStatusNotifierItem",
+                GLib.Variant("(s)", (BUS_NAME,)), None,
+                Gio.DBusCallFlags.NONE, 3000, None)
+            return False
+        except Exception:
+            return True          # try again on the next tick
+
+
+def main():
+    tray = Tray()
+
+    def on_acquired(conn, name, _user=None):
+        tray.register()
+        if tray.announce():
+            GLib.timeout_add_seconds(5, tray.announce)
+
+    Gio.bus_own_name(Gio.BusType.SESSION, BUS_NAME, Gio.BusNameOwnerFlags.NONE,
+                     on_acquired, None, None)
+
+    loop = GLib.MainLoop()
+    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM,
+                         lambda *_: (loop.quit(), False)[1], None)
+    # Plasma restarts take the watcher with them; re-announce when it comes back.
+    Gio.bus_watch_name(Gio.BusType.SESSION, "org.kde.StatusNotifierWatcher",
+                       Gio.BusNameWatcherFlags.NONE,
+                       lambda *_: tray.announce(), None)
+    loop.run()
+
+
+if __name__ == "__main__":
+    main()

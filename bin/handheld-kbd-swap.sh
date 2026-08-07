@@ -137,6 +137,13 @@ while true; do
         fi
     fi
 
+    # The tray icon is the way back when the keyboard misbehaves, so it is the last
+    # thing that should be missing. Plasma restarts take it with them.
+    if [ -x "$HOME/.local/bin/handheld-kbd-tray" ] \
+       && ! pgrep -f 'python3 .*handheld-kbd-tray' >/dev/null; then
+        setsid python3 "$HOME/.local/bin/handheld-kbd-tray" </dev/null >>/tmp/handheld-kbd-tray.log 2>&1 &
+    fi
+
     # Watchdog: the keyboard's Wayland connection drops when Steam restarts or the
     # compositor churns. Respawn it hidden so the next summon is instant.
     if ! pgrep -f 'python3 .*handheld-kbd\.py' >/dev/null; then
