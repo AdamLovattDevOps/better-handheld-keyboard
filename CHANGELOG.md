@@ -134,6 +134,30 @@ same way. KDE's Latin fallback covers global shortcuts, not an application's own
 by this test failing every save under `ru ua gr ara`, and passing the moment `us` was in
 the group. `handheld-kbd-locales` now warns when a selection has no Latin layout.
 
+### Fixed since rc8
+
+- **Upgrading no longer asks for a password you cannot type.** The privileged step —
+  the udev rule and `input` group that let the keyboard reach `/dev/uinput` — ran last,
+  so on a handheld the prompt could arrive after the keyboard it was replacing had gone,
+  with nothing to answer it with. It now runs first, while whatever keyboard you started
+  with is still alive. On an upgrade it does not run at all: the rule and the group are
+  already there, and the installer says so instead of asking.
+- **The 🌐 key names the language, not the country.** It showed the xkb code, and `il`
+  is Israel rather than Hebrew, `in` is India rather than Hindi, `latam` did not fit, and
+  `us` and `gb` are both English. Latin layouts keep the familiar two letters; the rest
+  get their own script — `עב`, `ع`, `हि`, `ไทย`, `РУ`, `УК`, `ΕΛ`.
+- **The logout prompt notices a swap.** It compared how many layouts were configured
+  against how many were running, so exchanging Russian for Vietnamese — four for four,
+  and the most likely change anyone makes — looked like nothing had happened. It compares
+  the two sets now.
+- **The language picker shows what is in rotation** before you change it, states the
+  four-at-a-time rule up front, and confirms rather than silently truncating when you
+  tick more, tick none, or tick four without a Latin layout among them.
+- **Currency symbols are part of the language test.** Most layouts keep theirs on the
+  third level — `€` on AltGr-E, `₺`, `₽`, `₪`, `฿`, `₫`, `₯` — so typing them exercises
+  AltGr and the level-3 labels in the place a user is most likely to notice being wrong.
+  Symbols are taken from each layout's own data rather than assumed.
+
 ### Fixed since rc5
 
 - **A label can no longer resize the keyboard.** The key grid is column-homogeneous, so

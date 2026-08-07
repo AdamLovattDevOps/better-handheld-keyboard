@@ -71,6 +71,9 @@ So I built the keyboard I wanted instead. Here's what it does differently:
 
 ## Install
 
+Upgrading? Just re-run the installer — it won't ask for a password, because the
+permission it needs is already there from last time.
+
 Double-click **`Install Better Handheld Keyboard.desktop`**, enter your password
 once (it needs `/dev/uinput` access — that's how it types real keys), then **log
 out and back in**.

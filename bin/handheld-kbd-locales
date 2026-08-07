@@ -53,10 +53,16 @@ BOLD, DIM, GREEN, YELLOW, RED, RESET = ("\033[1m", "\033[2m", "\033[32m",
 
 
 def available():
-    """{code: language name} for the layouts we ship labels for."""
+    """{code: language name} for the layouts we ship labels for.
+
+    The index also carries the 🌐 key badge per language; older installs hold a plain
+    {code: name} map, so accept both rather than breaking on an un-upgraded config.
+    """
     try:
         with open(os.path.join(SHIPPED, "index.json")) as f:
-            return json.load(f)
+            raw = json.load(f)
+        return {c: (v.get("name", c) if isinstance(v, dict) else v)
+                for c, v in raw.items()}
     except Exception:
         return {os.path.splitext(n)[0]: "" for n in sorted(os.listdir(SHIPPED))
                 if n.endswith(".json") and n != "index.json"}
@@ -261,36 +267,63 @@ def apply(codes, verb):
 
 
 def gui():
-    """A touch-friendly picker: tick up to four languages, get offered the logout.
+    """The language picker: what is in rotation now, tick four, log out if needed.
 
-    This exists because the CLI is exactly the wrong tool on a handheld — the thing being
-    configured is the keyboard, and kdialog is present on every KDE image.
+    A checklist rather than a command line, because the thing being configured is the
+    keyboard — needing a keyboard to fix the keyboard is the problem this project exists
+    for. It states the four-at-a-time rule up front rather than letting someone tick
+    eight and wonder why half of them vanished.
     """
-    avail, have = available(), configured()
-    args = ["kdialog", "--title", "Keyboard languages",
-            "--checklist", "Pick up to four — an XKB keymap holds four groups.\n"
-            "New picks need a log out to take effect."]
-    for code, name in sorted(avail.items()):
+    avail, have, now = available(), configured(), live() or []
+    rotation = ", ".join(now) if now else "none"
+    header = (f"In rotation now (the globe key cycles these): {rotation}\n\n"
+              f"Tick up to {MAX_LAYOUTS} — a keyboard layout map holds four at a time.\n"
+              f"Keep one Latin language among them, or Ctrl+S and Ctrl+C stop working.")
+    args = ["kdialog", "--title", "Keyboard languages", "--checklist", header]
+    for code, name in sorted(avail.items(), key=lambda kv: kv[1]):
         args += [code, f"{name} ({code})", "on" if code in have else "off"]
     try:
-        out = subprocess.run(args, capture_output=True, text=True, timeout=600)
+        out = subprocess.run(args, capture_output=True, text=True, timeout=900)
     except FileNotFoundError:
-        print("kdialog not found — use the CLI: handheld-kbd-locales set <codes>",
-              file=sys.stderr)
+        print("kdialog not found — use: handheld-kbd-locales set <codes>", file=sys.stderr)
         return 1
-    if out.returncode != 0:          # cancelled
+    if out.returncode != 0:                      # cancelled
         return 0
+
     picked = [c.strip('"') for c in out.stdout.split() if c.strip('"')]
     if not picked:
-        subprocess.run(["kdialog", "--sorry",
-                        "Nothing selected — keeping the current languages."], timeout=60)
+        subprocess.run(["kdialog", "--title", "Keyboard languages", "--sorry",
+                        "Nothing was ticked, so your languages are unchanged."],
+                       timeout=120)
         return 0
+
     if len(picked) > MAX_LAYOUTS:
-        subprocess.run(["kdialog", "--sorry",
-                        f"That was {len(picked)} — an XKB keymap holds four groups.\n"
-                        f"Keeping the first four: {', '.join(picked[:MAX_LAYOUTS])}"],
-                       timeout=60)
-    apply(picked, "layouts set to")
+        keep = picked[:MAX_LAYOUTS]
+        listed = "\n".join(f"  {c} — {avail.get(c, '')}" for c in keep)
+        r = subprocess.run(["kdialog", "--title", "Keyboard languages",
+                            "--warningcontinuecancel",
+                            f"You ticked {len(picked)}, and only {MAX_LAYOUTS} can be in "
+                            f"rotation.\n\nKeep these four?\n\n{listed}"], timeout=300)
+        if r.returncode != 0:
+            return 0
+        picked = keep
+
+    if not any(c in LATIN for c in picked):
+        r = subprocess.run(["kdialog", "--title", "Keyboard languages",
+                            "--warningcontinuecancel",
+                            "None of these use the Latin alphabet.\n\nApplication "
+                            "shortcuts are bound to Latin keys, so Ctrl+S, Ctrl+C and "
+                            "Ctrl+V will stop working until you add one.\n\n"
+                            "Carry on anyway?"], timeout=300)
+        if r.returncode != 0:
+            return 0
+
+    if sorted(picked) == sorted(have) and sorted(picked) == sorted(now):
+        subprocess.run(["kdialog", "--title", "Keyboard languages", "--msgbox",
+                        "No change — those are already in rotation."], timeout=120)
+        return 0
+
+    apply(picked, "layouts set to")               # this prompts for the logout
     return 0
 
 

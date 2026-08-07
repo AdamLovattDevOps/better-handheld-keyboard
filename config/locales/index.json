@@ -1,22 +1,82 @@
 {
-  "ara": "Arabic",
-  "br": "Portuguese (Brazil)",
-  "de": "German",
-  "es": "Spanish",
-  "fr": "French",
-  "gb": "English (UK)",
-  "gr": "Greek",
-  "il": "Hebrew",
-  "in": "Hindi (Devanagari)",
-  "it": "Italian",
-  "latam": "Spanish (Latin America)",
-  "nl": "Dutch",
-  "pl": "Polish",
-  "pt": "Portuguese",
-  "ru": "Russian",
-  "th": "Thai",
-  "tr": "Turkish",
-  "ua": "Ukrainian",
-  "us": "English (US)",
-  "vn": "Vietnamese"
+  "ara": {
+    "badge": "ع",
+    "name": "Arabic"
+  },
+  "br": {
+    "badge": "BR",
+    "name": "Portuguese (Brazil)"
+  },
+  "de": {
+    "badge": "DE",
+    "name": "German"
+  },
+  "es": {
+    "badge": "ES",
+    "name": "Spanish"
+  },
+  "fr": {
+    "badge": "FR",
+    "name": "French"
+  },
+  "gb": {
+    "badge": "UK",
+    "name": "English (UK)"
+  },
+  "gr": {
+    "badge": "ΕΛ",
+    "name": "Greek"
+  },
+  "il": {
+    "badge": "עב",
+    "name": "Hebrew"
+  },
+  "in": {
+    "badge": "हि",
+    "name": "Hindi (Devanagari)"
+  },
+  "it": {
+    "badge": "IT",
+    "name": "Italian"
+  },
+  "latam": {
+    "badge": "LA",
+    "name": "Spanish (Latin America)"
+  },
+  "nl": {
+    "badge": "NL",
+    "name": "Dutch"
+  },
+  "pl": {
+    "badge": "PL",
+    "name": "Polish"
+  },
+  "pt": {
+    "badge": "PT",
+    "name": "Portuguese"
+  },
+  "ru": {
+    "badge": "РУ",
+    "name": "Russian"
+  },
+  "th": {
+    "badge": "ไทย",
+    "name": "Thai"
+  },
+  "tr": {
+    "badge": "TR",
+    "name": "Turkish"
+  },
+  "ua": {
+    "badge": "УК",
+    "name": "Ukrainian"
+  },
+  "us": {
+    "badge": "US",
+    "name": "English (US)"
+  },
+  "vn": {
+    "badge": "VI",
+    "name": "Vietnamese"
+  }
 }
