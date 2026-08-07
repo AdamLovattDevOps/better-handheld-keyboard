@@ -312,7 +312,14 @@ function closeSteamOsk(w){
 
 function onAdded(w){
     setOp(w); watch(w); dockKbd(w); applyStack();
-    if (MIRROR && isSteamOsk(w)) onSteamOsk(w);
+    // Steam's OSK must never be left mapped-but-invisible in ANY trigger mode: setOp
+    // just made it transparent, and while it exists Steam holds the controller in its
+    // KB ActionSet — no trackpad or stick pointer. Mirror mode also toggles our
+    // keyboard off the event; other modes have their own trigger, so just close it.
+    if (isSteamOsk(w)) {
+        if (MIRROR) onSteamOsk(w);
+        else if (CLOSE_STEAM) closeSteamOsk(w);
+    }
     // When our OSK maps, the summon (touch gesture / map) may have shifted focus.
     // Re-assert the window the user was on so typed keys land there. keepBelow keeps
     // a demoted fullscreen window below the OSK even once it is active again.
@@ -332,8 +339,9 @@ workspace.windowList().forEach(function(w){
     dockKbd(w);
     // A Steam OSK left over from before this script loaded is still holding the
     // controller in KB ActionSet. Close it on sight — this is what gives a Deck its
-    // trackpad and stick pointer back without restarting Steam.
-    if (MIRROR && CLOSE_STEAM && isSteamOsk(w)) closeSteamOsk(w);
+    // trackpad and stick pointer back without restarting Steam. In every mode: an
+    // opacity-0 leftover kills the pointer whether or not we mirror it.
+    if (CLOSE_STEAM && isSteamOsk(w)) closeSteamOsk(w);
 });
 workspace.windowAdded.connect(onAdded);
 workspace.windowRemoved.connect(function(w){
