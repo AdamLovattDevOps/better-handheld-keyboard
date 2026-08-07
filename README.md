@@ -52,10 +52,11 @@ So I built the keyboard I wanted instead. Here's what it does differently:
   bottom dock.
 - **It doesn't need Steam.** `handheld-kbd-toggle` shows and hides it directly, so
   a dead Steam client can't leave you without a keyboard. Bind it to a shortcut.
-- **Your trackpads still work.** On a Deck, Steam's own keyboard is what summons this
-  one — and while Steam thinks its keyboard is open, the sticks and trackpads navigate
-  *that* instead of moving the pointer. Steam's keyboard is closed rather than hidden, so
-  the pointer stays yours.
+- **Your trackpads still work.** While Steam thinks its own keyboard is open, the
+  sticks and trackpads navigate *that* instead of moving the pointer. So whenever
+  Steam's keyboard appears — the button press that summons this one on a Deck, or a
+  controller focusing a text field on any device — it's closed rather than hidden,
+  whatever trigger mode you're in, and the pointer stays yours.
 - **A tray icon.** Tap to show or hide; right-click for restart, reset position, fix the
   trackpad pointer, stop and start.
 - **Shortcuts for when it goes wrong.** The same actions appear in the application menu —
@@ -120,7 +121,9 @@ desktop back to Steam's keyboard.
 Versions before 1.0.10 hid Steam's on-screen keyboard instead of closing it. Steam kept
 believing its keyboard was open, and while it believes that it puts the controller in its
 "KB ActionSet" — sticks and trackpads navigate Steam's keyboard rather than moving the
-pointer. Update, and if a session is still stuck:
+pointer. 1.0.10 and 1.0.11 closed it, but only in mirror mode, so a device on the DBus or
+hotkey trigger (a Legion Go 2, say) could still get stuck; since 1.0.12 it's closed in
+every trigger mode. Update, and if a session is still stuck:
 
 ```bash
 handheld-kbd-fix-pointer
