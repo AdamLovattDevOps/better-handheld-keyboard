@@ -28,6 +28,16 @@ import sys
 
 CFG_DIR = os.path.expanduser("~/.config/handheld-kbd")
 SHIPPED = os.path.join(CFG_DIR, "locales")
+
+# An XKB keymap holds at most four groups. This is not a KDE setting or a limit of this
+# program: ask libxkbcommon for five layouts and it discards the fifth outright —
+#
+#   xkbcommon: ERROR: [XKB-595] Unrecognized RMLVO layout "es" was ignored
+#
+# so a longer list silently becomes its first four, and 🌐 cycles those. Labels are
+# shipped for twenty layouts; four of them are live at a time, and which four is a
+# config change plus a log out.
+MAX_LAYOUTS = 4
 BOLD, DIM, GREEN, YELLOW, RESET = "\033[1m", "\033[2m", "\033[32m", "\033[33m", "\033[0m"
 
 
@@ -102,7 +112,8 @@ def show():
     if len(have) < 2:
         print(f"\n  {YELLOW}Only one layout: 🌐 has nowhere to switch to.{RESET}"
               f" Add one with 'handheld-kbd-locales add <code>'.")
-    print(f"\n{BOLD}Labels available{RESET}")
+    print(f"\n{BOLD}Labels available{RESET}"
+          f"  {DIM}(four can be live at once — an XKB keymap holds four groups){RESET}")
     for code, name in sorted(avail.items()):
         here = "•" if code in have else " "
         print(f"  {here} {code:6s} {name}")
@@ -112,8 +123,14 @@ def show():
 
 def apply(codes, verb):
     avail = available()
+    dropped = codes[MAX_LAYOUTS:]
+    codes = codes[:MAX_LAYOUTS]
     unknown = [c for c in codes if c not in avail]
     write_layouts(codes)
+    if dropped:
+        print(f"{YELLOW}!!{RESET} An XKB keymap holds four groups at most, so"
+              f" {', '.join(dropped)} {'were' if len(dropped) > 1 else 'was'} left out."
+              f"\n   Choose a different four with 'handheld-kbd-locales set <codes>'.")
     print(f"{GREEN}::{RESET} {verb}: {', '.join(codes) if codes else '(empty)'}")
     if unknown:
         print(f"{YELLOW}!!{RESET} no key labels for: {', '.join(unknown)} — they will type"
@@ -130,11 +147,47 @@ def apply(codes, verb):
         pass
 
 
+def gui():
+    """A touch-friendly picker: tick up to four languages, get offered the logout.
+
+    This exists because the CLI is exactly the wrong tool on a handheld — the thing being
+    configured is the keyboard, and kdialog is present on every KDE image.
+    """
+    avail, have = available(), configured()
+    args = ["kdialog", "--title", "Keyboard languages",
+            "--checklist", "Pick up to four — an XKB keymap holds four groups.\n"
+            "New picks need a log out to take effect."]
+    for code, name in sorted(avail.items()):
+        args += [code, f"{name} ({code})", "on" if code in have else "off"]
+    try:
+        out = subprocess.run(args, capture_output=True, text=True, timeout=600)
+    except FileNotFoundError:
+        print("kdialog not found — use the CLI: handheld-kbd-locales set <codes>",
+              file=sys.stderr)
+        return 1
+    if out.returncode != 0:          # cancelled
+        return 0
+    picked = [c.strip('"') for c in out.stdout.split() if c.strip('"')]
+    if not picked:
+        subprocess.run(["kdialog", "--sorry",
+                        "Nothing selected — keeping the current languages."], timeout=60)
+        return 0
+    if len(picked) > MAX_LAYOUTS:
+        subprocess.run(["kdialog", "--sorry",
+                        f"That was {len(picked)} — an XKB keymap holds four groups.\n"
+                        f"Keeping the first four: {', '.join(picked[:MAX_LAYOUTS])}"],
+                       timeout=60)
+    apply(picked, "layouts set to")
+    return 0
+
+
 def main():
     argv = sys.argv[1:]
     if not argv or argv[0] in ("list", "show", "-l"):
         show()
         return 0
+    if argv[0] == "--gui":
+        return gui()
     cmd, codes = argv[0], [c.strip().lower() for c in argv[1:] if c.strip()]
     if cmd in ("-h", "--help", "help"):
         print(__doc__)
@@ -152,6 +205,13 @@ def main():
         if new == have:
             print(f"{DIM}already configured: {', '.join(codes)}{RESET}")
             return 0
+        if len(new) > MAX_LAYOUTS:
+            print(f"{YELLOW}!!{RESET} That would be {len(new)} layouts, and an XKB keymap"
+                  f" holds four.\n   You have: {', '.join(have)}"
+                  f"\n   Replace them outright with:"
+                  f" handheld-kbd-locales set {' '.join((have + codes)[:MAX_LAYOUTS])}",
+                  file=sys.stderr)
+            return 1
         apply(new, "layouts")
     elif cmd in ("remove", "rm"):
         new = [c for c in have if c not in codes]

@@ -13,7 +13,7 @@ If any JSON is missing/invalid, built-in defaults are used so it always comes up
 """
 import gi, sys, time, os, signal, json, subprocess, math, re
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk, GLib
+from gi.repository import Gtk, Gdk, GLib, Pango
 from evdev import UInput, ecodes as e
 GLib.set_prgname("handheld-kbd")   # app_id so the KWin window-rule can match us
 
@@ -157,16 +157,35 @@ def load_locale_map(code):
 
 
 def active_layout_code():
-    """The XKB layout code (e.g. 'us'/'gb') KDE currently has active."""
+    """The XKB layout code (e.g. 'us'/'gb') KDE currently has active.
+
+    Both the list and the index must come from the LIVE session. This used to read the
+    list from kxkbrc and only the index from DBus — but kxkbrc is what the *next* session
+    will load, not what this one is running: KWin builds its keymap at login and never
+    re-reads the file. Edit the file (handheld-kbd-locales does) and the two go different
+    lengths and orders, so list[index] names some other layout entirely — the keyboard
+    drew Brazilian labels while the OS typed US.
+    """
+    try:
+        out = subprocess.check_output(
+            ["busctl", "--user", "call", "org.kde.keyboard", "/Layouts",
+             "org.kde.KeyboardLayouts", "getLayoutsList"], text=True, timeout=3)
+        # a(sss): triplets of (code, variant, display name), every string quoted.
+        codes = out.split('"')[1::2][0::3]
+        idx = int(subprocess.check_output(
+            ["qdbus6", "org.kde.keyboard", "/Layouts", "org.kde.KeyboardLayouts.getLayout"],
+            text=True, timeout=3).strip())
+        if codes:
+            return codes[idx] if 0 <= idx < len(codes) else codes[0]
+    except Exception:
+        pass
+    # No live answer (e.g. kded still starting): fall back to the config file.
     try:
         ll = subprocess.check_output(
             ["kreadconfig6", "--file", "kxkbrc", "--group", "Layout", "--key", "LayoutList"],
             text=True, timeout=3).strip()
         codes = [c.strip() for c in ll.split(",") if c.strip()]
-        idx = int(subprocess.check_output(
-            ["qdbus6", "org.kde.keyboard", "/Layouts", "org.kde.KeyboardLayouts.getLayout"],
-            text=True, timeout=3).strip())
-        return codes[idx] if 0 <= idx < len(codes) else (codes[0] if codes else "us")
+        return codes[0] if codes else "us"
     except Exception:
         return "us"
 
@@ -279,6 +298,16 @@ class OSK(Gtk.Window):
             for (label, kc, kind, shifted, name) in row:
                 sp = SPAN.get(kind, 2)
                 b = Gtk.Button(label=label)
+                # A label must never dictate the window's size. The grid is
+                # column-homogeneous, so ONE wide label widens every column — the 🌐 key
+                # reading "🌐LATAM" pushed the whole keyboard to 1728px on a 1280px
+                # desktop, and since GTK refuses to shrink a window below its natural
+                # width, ⤓ could no longer bring it back either. Ellipsizing makes the
+                # natural width tiny; the homogeneous grid still gives every key its
+                # even share of whatever width the dock grants.
+                ch = b.get_child()
+                if isinstance(ch, Gtk.Label):
+                    ch.set_ellipsize(Pango.EllipsizeMode.END)
                 b.set_can_focus(False)
                 b.set_hexpand(True); b.set_vexpand(False)
                 b.set_size_request(-1, kh)
@@ -421,6 +450,10 @@ class OSK(Gtk.Window):
         bar.set_size_request(-1, int(self.cfg.get("suggest_height", 44)))
         for i in range(n):
             b = Gtk.Button(label="")
+            # Same rule as the keys: a long suggested word must not widen the window.
+            ch = b.get_child()
+            if isinstance(ch, Gtk.Label):
+                ch.set_ellipsize(Pango.EllipsizeMode.END)
             b.set_can_focus(False)
             b.set_hexpand(True)
             b.get_style_context().add_class("suggest")

@@ -26,6 +26,8 @@ import time
 import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GLib      # noqa: E402
+
+GLib.set_prgname("handheld-kbd-typing-test")   # so KWin can find the window to focus
 from evdev import UInput, ecodes as e    # noqa: E402
 
 LOCALES = os.path.expanduser("~/.config/handheld-kbd/locales")
@@ -114,6 +116,30 @@ def switch_to(code):
     return current()
 
 
+APP_ID = "handheld-kbd-typing-test"
+
+
+def kwin_activate():
+    """Give the sink keyboard focus.
+
+    A Wayland client cannot focus itself, and a keystroke goes to whatever the compositor
+    thinks is active — so without this the test types into someone else's window and reads
+    back an empty entry, which looks exactly like every layout being broken.
+    """
+    js = "/tmp/handheld-kbd-typing-activate.js"
+    with open(js, "w") as f:
+        f.write(
+            'workspace.windowList().forEach(function(w){'
+            f'  if (("" + w.resourceClass).indexOf("{APP_ID}") !== -1)'
+            '     workspace.activeWindow = w;'
+            '});')
+    for args in (["unloadScript", "hk-activate"], ["loadScript", js, "hk-activate"],
+                 ["start"]):
+        subprocess.run(["qdbus6", "org.kde.KWin", "/Scripting",
+                        "org.kde.kwin.Scripting." + args[0]] + args[1:],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+
+
 class Sink(Gtk.Window):
     """A focused text entry, which is the only honest way to ask what arrived."""
 
@@ -125,6 +151,17 @@ class Sink(Gtk.Window):
         self.set_keep_above(True)
         self.show_all()
         self.entry.grab_focus()
+        self.present()
+
+    def take_focus(self, timeout=5.0):
+        end = time.time() + timeout
+        while time.time() < end:
+            if self.has_toplevel_focus():
+                return True
+            self.present()
+            kwin_activate()
+            pump(0.5)
+        return self.has_toplevel_focus()
 
     def typed(self):
         return self.entry.get_text()
@@ -154,6 +191,8 @@ def run_one(code, ui, sink, settle):
     unmapped = sorted({c for c in sentence if c not in cmap})
     typeable = "".join(c for c in sentence if c in cmap)
 
+    if not sink.take_focus():
+        return code, None, "the sink window could not take keyboard focus", []
     sink.clear()
     pump(0.4)
     for ch in typeable:
@@ -173,12 +212,19 @@ def run_one(code, ui, sink, settle):
 
 def main():
     wanted = [c for c in sys.argv[1:] if c in SENTENCES] or list(SENTENCES)
-    ui = UInput({e.EV_KEY: sorted({getattr(e, n) for n in dir(e)
-                                   if n.startswith("KEY_")
-                                   and isinstance(getattr(e, n), int)})},
-                name="handheld-kbd-typing-test")
+
+    # Only the keys these layouts actually use. Enabling every KEY_* name evdev exposes
+    # fails outright — the module also defines KEY_MAX and KEY_CNT, which are counts
+    # rather than keys, and the kernel rejects the whole device because of them.
+    keys = {e.KEY_LEFTSHIFT, e.KEY_RIGHTALT, e.KEY_SPACE}
+    for code in wanted:
+        cmap, err = char_map(code)
+        if cmap:
+            keys |= {kc for kc, _ in cmap.values()}
+    ui = UInput({e.EV_KEY: sorted(keys)}, name="handheld-kbd-typing-test")
     sink = Sink()
     pump(1.0)
+    sink.take_focus()
 
     failures = 0
     for code in wanted:

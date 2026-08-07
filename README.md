@@ -163,12 +163,16 @@ with `"prediction": false`.
 
 ```bash
 handheld-kbd-locales                # what's configured, and what labels exist
-handheld-kbd-locales add it vn      # Italian and Vietnamese
-handheld-kbd-locales set us ru      # replace the list
+handheld-kbd-locales set us gb it ru
 ```
 
 Then log out and back in — KDE reads its layout list at session start — and 🌐 cycles
 through them.
+
+**Four at a time.** Labels ship for twenty layouts, but an XKB keymap holds four groups
+at most, so four can be live at once. That is the keymap format, not a setting: ask
+libxkbcommon for a fifth and it discards it outright (`Unrecognized RMLVO layout "es" was
+ignored`). Swapping which four is a `set` plus a log out.
 
 Worth knowing how this works, because it explains what it can and can't do. The keyboard
 injects real keycodes, exactly like a USB keyboard; **what a key types is decided by the
