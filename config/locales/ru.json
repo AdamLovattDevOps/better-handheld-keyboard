@@ -9,15 +9,15 @@
   },
   "KEY_2": {
     "label": "2",
-    "shifted": "@"
+    "shifted": "\""
   },
   "KEY_3": {
     "label": "3",
-    "shifted": "#"
+    "shifted": "№"
   },
   "KEY_4": {
     "label": "4",
-    "shifted": "$"
+    "shifted": ";"
   },
   "KEY_5": {
     "label": "5",
@@ -25,13 +25,14 @@
   },
   "KEY_6": {
     "label": "6",
-    "shifted": "^"
+    "shifted": ":"
   },
   "KEY_7": {
     "label": "7",
-    "shifted": "&"
+    "shifted": "?"
   },
   "KEY_8": {
+    "alt": "₽",
     "label": "8",
     "shifted": "*"
   },
@@ -40,125 +41,118 @@
     "shifted": "("
   },
   "KEY_A": {
-    "label": "a"
+    "label": "ф"
   },
   "KEY_APOSTROPHE": {
-    "label": "'",
-    "shifted": "\""
+    "label": "э"
   },
   "KEY_B": {
-    "label": "b"
+    "label": "и"
   },
   "KEY_BACKSLASH": {
     "label": "\\",
-    "shifted": "|"
+    "shifted": "/"
   },
   "KEY_C": {
-    "label": "c"
+    "label": "с"
   },
   "KEY_COMMA": {
-    "label": ",",
-    "shifted": "<"
+    "label": "б"
   },
   "KEY_D": {
-    "label": "d"
+    "label": "в"
   },
   "KEY_DOT": {
-    "label": ".",
-    "shifted": ">"
+    "label": "ю"
   },
   "KEY_E": {
-    "label": "e"
+    "label": "у"
   },
   "KEY_EQUAL": {
     "label": "=",
     "shifted": "+"
   },
   "KEY_F": {
-    "label": "f"
+    "label": "а"
   },
   "KEY_G": {
-    "label": "g"
+    "label": "п"
   },
   "KEY_GRAVE": {
-    "label": "`",
-    "shifted": "~"
+    "label": "ё"
   },
   "KEY_H": {
-    "label": "h"
+    "label": "р"
   },
   "KEY_I": {
-    "label": "i"
+    "label": "ш"
   },
   "KEY_J": {
-    "label": "j"
+    "label": "о"
   },
   "KEY_K": {
-    "label": "k"
+    "label": "л"
   },
   "KEY_L": {
-    "label": "l"
+    "label": "д"
   },
   "KEY_LEFTBRACE": {
-    "label": "[",
-    "shifted": "{"
+    "label": "х"
   },
   "KEY_M": {
-    "label": "m"
+    "label": "ь"
   },
   "KEY_MINUS": {
     "label": "-",
     "shifted": "_"
   },
   "KEY_N": {
-    "label": "n"
+    "label": "т"
   },
   "KEY_O": {
-    "label": "o"
+    "label": "щ"
   },
   "KEY_P": {
-    "label": "p"
+    "label": "з"
   },
   "KEY_Q": {
-    "label": "q"
+    "label": "й"
   },
   "KEY_R": {
-    "label": "r"
+    "label": "к"
   },
   "KEY_RIGHTBRACE": {
-    "label": "]",
-    "shifted": "}"
+    "label": "ъ"
   },
   "KEY_S": {
-    "label": "s"
+    "label": "ы"
   },
   "KEY_SEMICOLON": {
-    "label": ";",
-    "shifted": ":"
+    "label": "ж"
   },
   "KEY_SLASH": {
-    "label": "/",
-    "shifted": "?"
+    "label": ".",
+    "shifted": ","
   },
   "KEY_T": {
-    "label": "t"
+    "label": "е"
   },
   "KEY_U": {
-    "label": "u"
+    "label": "г"
   },
   "KEY_V": {
-    "label": "v"
+    "label": "м"
   },
   "KEY_W": {
-    "label": "w"
+    "label": "ц"
   },
   "KEY_X": {
-    "label": "x"
+    "label": "ч"
   },
   "KEY_Y": {
-    "label": "y"
+    "label": "н"
   },
   "KEY_Z": {
-    "label": "z"
+    "label": "я"
   }
 }

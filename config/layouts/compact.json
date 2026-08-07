@@ -279,6 +279,11 @@
         "kind": "mod"
       },
       {
+        "label": "AltGr",
+        "key": "KEY_RIGHTALT",
+        "kind": "mod"
+      },
+      {
         "label": "Space",
         "key": "KEY_SPACE",
         "kind": "space"
@@ -298,6 +303,10 @@
       {
         "label": "→",
         "key": "KEY_RIGHT"
+      },
+      {
+        "label": "🌐",
+        "kind": "locale"
       }
     ]
   ]

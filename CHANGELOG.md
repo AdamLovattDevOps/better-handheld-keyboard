@@ -9,6 +9,50 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.0.11 — Twenty languages
+
+Pre-release. The mechanism is tested; the individual layouts are not — I read Latin
+scripts and can spot-check Cyrillic and Greek, and that is the end of my usefulness as a
+proofreader for Arabic, Hebrew, Devanagari and Thai. Corrections very welcome.
+
+### Added
+
+- **Key labels for twenty XKB layouts.** English (US/UK), German, French, Spanish (Spain
+  and Latin America), Italian, Portuguese (Portugal and Brazil), Dutch, Polish, Turkish,
+  Russian, Ukrainian, Greek, Arabic, Hebrew, Hindi (Devanagari), Thai and Vietnamese.
+  🌐 switches between the layouts KDE has configured and re-skins the keys to match.
+
+  These are *labels*, not behaviour. The keyboard injects real keycodes, so what a key
+  types was always decided by the OS layout — what was missing is the keyboard admitting
+  it, by drawing `й` on the key that types `й` instead of `q`. A layout with no labels
+  still works; it is just drawn with US captions.
+
+  They are generated from [xkeyboard-config](https://gitlab.freedesktop.org/xkeyboard-config/xkeyboard-config)
+  and xorgproto's `keysymdef.h` by `tools/build-locales.py`, and committed. Typing them
+  out by hand would have been twenty chances to be subtly wrong in scripts I cannot
+  proofread.
+
+- **AltGr.** Most non-English layouts keep a third of their characters on the third level
+  — Polish `ą`, French `@`, Turkish `î`, Italian `[` — and without an AltGr key they were
+  simply unreachable. Holding it re-skins the keys to show what they will type, rather
+  than printing three glyphs on a key the size of a fingernail. Existing installs get the
+  key added to their layout on upgrade.
+
+- **`handheld-kbd-locales`** — list, add, remove or set the layouts KDE offers, since
+  🌐 can only reach layouts KDE has been told about, and with one configured it has
+  nowhere to go. Reports which have labels and which don't, and reminds you that KDE
+  reads its layout list at session start.
+
+### Notes on what this can't do
+
+- **Chinese, Japanese and Korean are absent and will stay absent.** They are input methods,
+  not keyboard layouts; no mapping of keycodes to characters produces them. Fcitx and IBus
+  work with this keyboard exactly as with any other, because the keystrokes are real.
+- **Vietnamese is a halfway case.** The `vn` layout puts `ă â ê ô ơ ư đ` on the number row
+  and tone marks on `5`–`9` — which costs you the digits and still cannot produce every
+  syllable. Most Vietnamese typing uses an IME (Telex/VNI) over a US layout. That works
+  here; the layout is shipped for those who want it.
+
 ## v1.0.10 — The Steam Deck keeps its trackpads
 
 ### Fixed

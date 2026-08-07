@@ -1,0 +1,183 @@
+{
+  "KEY_0": {
+    "alt": "٠",
+    "label": "0",
+    "shifted": "("
+  },
+  "KEY_1": {
+    "alt": "١",
+    "label": "1",
+    "shifted": "!"
+  },
+  "KEY_2": {
+    "alt": "٢",
+    "label": "2",
+    "shifted": "@"
+  },
+  "KEY_3": {
+    "alt": "٣",
+    "label": "3",
+    "shifted": "#"
+  },
+  "KEY_4": {
+    "alt": "٤",
+    "label": "4",
+    "shifted": "$"
+  },
+  "KEY_5": {
+    "alt": "٥",
+    "label": "5",
+    "shifted": "%"
+  },
+  "KEY_6": {
+    "alt": "٦",
+    "label": "6",
+    "shifted": "^"
+  },
+  "KEY_7": {
+    "alt": "٧",
+    "label": "7",
+    "shifted": "&"
+  },
+  "KEY_8": {
+    "alt": "٨",
+    "label": "8",
+    "shifted": "*"
+  },
+  "KEY_9": {
+    "alt": "٩",
+    "label": "9",
+    "shifted": ")"
+  },
+  "KEY_A": {
+    "label": "ش",
+    "shifted": "ِ"
+  },
+  "KEY_APOSTROPHE": {
+    "alt": "⟩",
+    "label": "ط",
+    "shifted": "\""
+  },
+  "KEY_BACKSLASH": {
+    "alt": "⟨",
+    "label": "\\",
+    "shifted": "|"
+  },
+  "KEY_C": {
+    "label": "ؤ",
+    "shifted": "}"
+  },
+  "KEY_D": {
+    "label": "ي",
+    "shifted": "]"
+  },
+  "KEY_E": {
+    "label": "ث",
+    "shifted": "ُ"
+  },
+  "KEY_EQUAL": {
+    "alt": "≠",
+    "label": "=",
+    "shifted": "+"
+  },
+  "KEY_F": {
+    "alt": "پ",
+    "label": "ب",
+    "shifted": "["
+  },
+  "KEY_G": {
+    "label": "ل",
+    "shifted": "ﻷ"
+  },
+  "KEY_GRAVE": {
+    "alt": "٪",
+    "label": "ذ",
+    "shifted": "ّ"
+  },
+  "KEY_H": {
+    "alt": "ٱ",
+    "label": "ا",
+    "shifted": "أ"
+  },
+  "KEY_I": {
+    "label": "ه",
+    "shifted": "÷"
+  },
+  "KEY_J": {
+    "label": "ت",
+    "shifted": "ـ"
+  },
+  "KEY_K": {
+    "alt": "٫",
+    "label": "ن",
+    "shifted": "،"
+  },
+  "KEY_L": {
+    "label": "م",
+    "shifted": "/"
+  },
+  "KEY_LEFTBRACE": {
+    "alt": "چ",
+    "label": "ج",
+    "shifted": "<"
+  },
+  "KEY_MINUS": {
+    "alt": "–",
+    "label": "-",
+    "shifted": "_"
+  },
+  "KEY_O": {
+    "label": "خ",
+    "shifted": "×"
+  },
+  "KEY_P": {
+    "label": "ح",
+    "shifted": "؛"
+  },
+  "KEY_Q": {
+    "label": "ض",
+    "shifted": "َ"
+  },
+  "KEY_R": {
+    "label": "ق",
+    "shifted": "ٌ"
+  },
+  "KEY_RIGHTBRACE": {
+    "label": "د",
+    "shifted": ">"
+  },
+  "KEY_S": {
+    "label": "س",
+    "shifted": "ٍ"
+  },
+  "KEY_SEMICOLON": {
+    "alt": "گ",
+    "label": "ك",
+    "shifted": ":"
+  },
+  "KEY_T": {
+    "alt": "ڤ",
+    "label": "ف",
+    "shifted": "ﻹ"
+  },
+  "KEY_U": {
+    "label": "ع",
+    "shifted": "`"
+  },
+  "KEY_W": {
+    "label": "ص",
+    "shifted": "ً"
+  },
+  "KEY_X": {
+    "label": "ء",
+    "shifted": "ْ"
+  },
+  "KEY_Y": {
+    "label": "غ",
+    "shifted": "إ"
+  },
+  "KEY_Z": {
+    "label": "ئ",
+    "shifted": "~"
+  }
+}

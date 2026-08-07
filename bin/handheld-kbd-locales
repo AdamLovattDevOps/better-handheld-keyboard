@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+"""Choose which keyboard layouts the 🌐 key cycles through.
+
+The keyboard injects real keycodes, so what a key TYPES is decided by the OS layout, not
+by us. 🌐 asks KDE to switch to its next layout and then re-skins the keys to match. That
+means it can only reach layouts KDE has been told about — with one layout configured,
+🌐 has nowhere to go.
+
+This edits KDE's layout list for you, and reports which of them this keyboard has key
+labels for.
+
+    handheld-kbd-locales                list what is configured, and what is available
+    handheld-kbd-locales add it vn      add Italian and Vietnamese
+    handheld-kbd-locales remove vn      remove Vietnamese
+    handheld-kbd-locales set us it ru   replace the list outright
+
+KDE reads this list when the session starts, so a change needs a log out and back in
+before 🌐 can reach the new layouts. You are told when that applies.
+
+Chinese, Japanese and Korean are not here, and can't be: they are input methods rather
+than keyboard layouts, and no mapping of keycodes to characters produces them. Use
+Fcitx or IBus for those — this keyboard's keystrokes go to it like any other keyboard's.
+"""
+import json
+import os
+import subprocess
+import sys
+
+CFG_DIR = os.path.expanduser("~/.config/handheld-kbd")
+SHIPPED = os.path.join(CFG_DIR, "locales")
+BOLD, DIM, GREEN, YELLOW, RESET = "\033[1m", "\033[2m", "\033[32m", "\033[33m", "\033[0m"
+
+
+def available():
+    """{code: language name} for the layouts we ship labels for."""
+    try:
+        with open(os.path.join(SHIPPED, "index.json")) as f:
+            return json.load(f)
+    except Exception:
+        return {os.path.splitext(n)[0]: "" for n in sorted(os.listdir(SHIPPED))
+                if n.endswith(".json") and n != "index.json"}
+
+
+def kread(key, default=""):
+    try:
+        return subprocess.check_output(
+            ["kreadconfig6", "--file", "kxkbrc", "--group", "Layout", "--key", key],
+            text=True, timeout=5).strip()
+    except Exception:
+        return default
+
+
+def kwrite(key, value):
+    subprocess.run(["kwriteconfig6", "--file", "kxkbrc", "--group", "Layout",
+                    "--key", key, value], check=True, timeout=5)
+
+
+def configured():
+    return [c for c in kread("LayoutList").split(",") if c.strip()]
+
+
+def write_layouts(codes):
+    # DisplayNames and VariantList are positional: leaving stale entries behind gives the
+    # wrong label, or the wrong variant, for every layout after the one that changed.
+    kwrite("LayoutList", ",".join(codes))
+    kwrite("VariantList", ",".join("" for _ in codes))
+    kwrite("DisplayNames", ",".join("" for _ in codes))
+    kwrite("Use", "true")
+    if len(codes) > 1:
+        kwrite("SwitchMode", "Global")
+
+
+def show():
+    avail, have = available(), configured()
+    print(f"{BOLD}Configured in KDE{RESET} (🌐 cycles these, in order)")
+    if have:
+        for c in have:
+            name = avail.get(c)
+            mark = f"{GREEN}labels{RESET}" if c in avail else f"{YELLOW}no labels{RESET}"
+            print(f"  {c:6s} {mark:22s} {name or ''}")
+    else:
+        print(f"  {DIM}(none — KDE has no layout list set){RESET}")
+    if len(have) < 2:
+        print(f"\n  {YELLOW}Only one layout: 🌐 has nowhere to switch to.{RESET}"
+              f" Add one with 'handheld-kbd-locales add <code>'.")
+    print(f"\n{BOLD}Labels available{RESET}")
+    for code, name in sorted(avail.items()):
+        here = "•" if code in have else " "
+        print(f"  {here} {code:6s} {name}")
+    print(f"\n{DIM}A layout with no labels still works — the keys type correctly, they are"
+          f"\njust drawn with US captions.{RESET}")
+
+
+def apply(codes, verb):
+    avail = available()
+    unknown = [c for c in codes if c not in avail]
+    write_layouts(codes)
+    print(f"{GREEN}::{RESET} {verb}: {', '.join(codes) if codes else '(empty)'}")
+    if unknown:
+        print(f"{YELLOW}!!{RESET} no key labels for: {', '.join(unknown)} — they will type"
+              f" correctly but be drawn with US captions.")
+    print(f"{YELLOW}!!{RESET} Log out and back in — KDE reads its layout list at session start.")
+
+
+def main():
+    argv = sys.argv[1:]
+    if not argv or argv[0] in ("list", "show", "-l"):
+        show()
+        return 0
+    cmd, codes = argv[0], [c.strip().lower() for c in argv[1:] if c.strip()]
+    if cmd in ("-h", "--help", "help"):
+        print(__doc__)
+        return 0
+    if cmd not in ("add", "remove", "rm", "set"):
+        print(f"usage: handheld-kbd-locales [list|add|remove|set] [codes…]", file=sys.stderr)
+        return 2
+    if not codes:
+        print(f"handheld-kbd-locales {cmd}: needs at least one layout code", file=sys.stderr)
+        return 2
+
+    have = configured() or ["us"]
+    if cmd == "add":
+        new = have + [c for c in codes if c not in have]
+        if new == have:
+            print(f"{DIM}already configured: {', '.join(codes)}{RESET}")
+            return 0
+        apply(new, "layouts")
+    elif cmd in ("remove", "rm"):
+        new = [c for c in have if c not in codes]
+        if not new:
+            print("refusing to remove every layout — KDE needs at least one", file=sys.stderr)
+            return 1
+        if new == have:
+            print(f"{DIM}not configured: {', '.join(codes)}{RESET}")
+            return 0
+        apply(new, "layouts")
+    else:
+        apply(codes, "layouts set to")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except FileNotFoundError as ex:
+        print(f"handheld-kbd-locales: {ex} — this needs KDE Plasma 6", file=sys.stderr)
+        sys.exit(1)
