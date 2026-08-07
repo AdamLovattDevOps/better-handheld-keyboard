@@ -46,6 +46,14 @@ proofreader for Arabic, Hebrew, Devanagari and Thai. Corrections very welcome.
   - `key <AD08> { type[group1] = "…", [ i, I ] }` — that first bracket is not a symbol
     list, and taking it lost Turkish's dotted/dotless `i`.
 
+  Three parser bugs, each of which shipped a layout that looked plausible and put
+  characters on the wrong keys, is three too many to keep finding by eye — particularly
+  in scripts I can't read. Every label is now checked against **libxkbcommon**, which is
+  the same library the compositor uses to decide what a key actually types, by
+  `tools/verify-locales.py`. A label that disagrees is a key drawn with a character it
+  does not produce. All 940 key/level pairs across the twenty layouts agree, and CI
+  re-checks it on every push.
+
 - **AltGr.** Most non-English layouts keep a third of their characters on the third level
   — Polish `ą`, French `@`, Turkish `î`, Italian `[` — and without an AltGr key they were
   simply unreachable. Holding it re-skins the keys to show what they will type, rather
