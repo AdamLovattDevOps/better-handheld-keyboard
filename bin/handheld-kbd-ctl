@@ -30,7 +30,7 @@ export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 # not a session. Re-run ourselves in a transient unit of our own, which nothing here stops.
 if [ -z "${HK_DETACHED:-}" ] && command -v systemd-run >/dev/null 2>&1; then
     case "${1:-restart}" in
-        start|stop|restart|super-icon)
+        start|stop|restart|super-icon|set)
             if grep -qs 'handheld-kbd' /proc/self/cgroup; then
                 exec systemd-run --user --collect --quiet --pipe \
                      --unit="handheld-kbd-ctl-$$" --setenv=HK_DETACHED=1 \
@@ -161,8 +161,56 @@ PY
         running "$KBD_PAT" && echo "super key icon set to $icon." \
             || { echo "icon set; keyboard did not come back — see /tmp/handheld-kbd-out.log" >&2; exit 1; }
         ;;
+    set)
+        # Generic config setter for the tray's Settings menu (and the command line):
+        # write one key, then restart so the keyboard re-reads it. `type` tells us how to
+        # store the value — bool/int/float/str — defaulting to a best guess.
+        #   handheld-kbd-ctl set prediction false bool
+        #   handheld-kbd-ctl set layout compact str
+        #   handheld-kbd-ctl set suggestion_count 4 int
+        key="${2:-}"; val="${3:-}"; typ="${4:-auto}"
+        [ -n "$key" ] || { echo "usage: handheld-kbd-ctl set <key> <value> [bool|int|float|str]" >&2; exit 2; }
+        python3 - "$key" "$val" "$typ" <<'PY' || { echo "handheld-kbd-ctl: could not set config" >&2; exit 1; }
+import json, os, sys
+key, val, typ = sys.argv[1], sys.argv[2], sys.argv[3]
+
+
+def coerce(v, t):
+    if t == "bool":
+        return v.strip().lower() in ("1", "true", "yes", "on")
+    if t == "int":
+        return int(v)
+    if t == "float":
+        return float(v)
+    if t == "str":
+        return v
+    low = v.strip().lower()          # auto: infer from the literal
+    if low in ("true", "false"):
+        return low == "true"
+    for cast in (int, float):
+        try:
+            return cast(v)
+        except ValueError:
+            pass
+    return v
+
+
+p = os.path.expanduser("~/.config/handheld-kbd/config.json")
+try:
+    c = json.load(open(p))
+except Exception:
+    c = {}
+c[key] = coerce(val, typ)
+os.makedirs(os.path.dirname(p), exist_ok=True)
+json.dump(c, open(p, "w"), indent=2)
+PY
+        stop_all
+        start_all
+        running "$KBD_PAT" && echo "$key set to $val." \
+            || { echo "$key set; keyboard did not come back — see /tmp/handheld-kbd-out.log" >&2; exit 1; }
+        ;;
     *)
-        echo "usage: handheld-kbd-ctl [status|start|stop|restart|reset|super-icon <windows|arch|tux>]" >&2
+        echo "usage: handheld-kbd-ctl [status|start|stop|restart|reset|super-icon <windows|arch|tux>|set <key> <value> [type]]" >&2
         exit 2
         ;;
 esac

@@ -58,7 +58,9 @@ So I built the keyboard I wanted instead. Here's what it does differently:
   controller focusing a text field on any device — it's closed rather than hidden,
   whatever trigger mode you're in, and the pointer stays yours.
 - **A tray icon.** Tap to show or hide; right-click for restart, reset position, fix the
-  trackpad pointer, stop and start.
+  trackpad pointer, stop and start — and a **Settings** submenu that toggles prediction,
+  glide typing, show-on-focus and the rest, and picks the layout, super-key icon,
+  suggestion count and more, without touching `config.json`.
 - **Shortcuts for when it goes wrong.** The same actions appear in the application menu —
   clickable, because typing is the one thing you can't do when the keyboard is the
   problem.
@@ -143,6 +145,8 @@ handheld-kbd-ctl status      # what's running, and where the keyboard is
 handheld-kbd-ctl restart     # the usual fix
 handheld-kbd-ctl stop        # until you start it again or log back in
 handheld-kbd-ctl reset       # back to the bottom dock
+handheld-kbd-ctl set prediction false bool   # set any config key, then restart
+handheld-kbd-ctl set layout compact str      # (the tray Settings menu drives this)
 ```
 
 All of these are in the application menu too.

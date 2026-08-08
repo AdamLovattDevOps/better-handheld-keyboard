@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""System tray icon: show/hide the keyboard, restart it, put it back.
+"""System tray icon: show/hide the keyboard, restart it, put it back, and configure it.
 
 A separate process from the keyboard on purpose. The tray's whole job is to rescue a
 keyboard that is misbehaving, so it must not share a process with the thing it rescues —
@@ -8,6 +8,13 @@ and clicking "Restart" would otherwise mean killing yourself mid-click.
 This talks the StatusNotifierItem protocol to Plasma directly over DBus, rather than
 through libappindicator. SteamOS is an immutable image with no pip and no appindicator
 package, so a dependency here is a dependency that cannot be installed.
+
+The "Settings" submenu exposes every configurable that maps cleanly onto a tray menu:
+on/off toggles (a checkmark) and short pick-lists (a radio submenu). Each writes the
+config and restarts the keyboard via `handheld-kbd-ctl set <key> <value>`. Numeric,
+colour and geometry settings stay in the config file and on the on-keyboard keys (the
+move/lock/reset keys, the opacity/size keys), where a slider or coordinate makes sense
+and a tray radio does not.
 
     handheld-kbd-tray            run it (normally started by autostart)
 """
@@ -24,17 +31,74 @@ from gi.repository import Gio, GLib     # noqa: E402
 
 BIN = os.path.expanduser("~/.local/bin")
 CFG = os.path.expanduser("~/.config/handheld-kbd/config.json")
+LAYOUT_DIR = os.path.expanduser("~/.config/handheld-kbd/layouts")
 
-# The "Super key icon" submenu: (item id, menu label, config value).
-SUPER_ICONS = [(10, "Windows", "windows"), (11, "Arch", "arch"), (12, "Tux", "tux")]
-SUPER_MENU_ID = 9
+# ---- what the Settings submenu exposes ---------------------------------------
+# Defaults mirror handheld-kbd.py's DEFAULT_CONFIG, so a key absent from the config
+# file still shows the right state (the keyboard fills these in the same way).
+DEFAULTS = {
+    "prediction": True, "predict_learn": True, "swipe": True,
+    "show_on_focus": False, "gesture_summon": False, "start_big": False,
+    "mirror": True,
+    "layout": "full", "position_mode": "bottom",
+    "suggestion_count": 3, "gesture_fingers": 2, "super_icon": "windows",
+}
+
+# Boolean toggles, in display order: (config key, label).
+BOOL_SETTINGS = [
+    ("prediction",     "Prediction"),
+    ("predict_learn",  "Learn words"),
+    ("swipe",          "Glide (swipe) typing"),
+    ("show_on_focus",  "Show on focus"),
+    ("gesture_summon", "Swipe-up summon"),
+    ("start_big",      "Start in big mode"),
+    ("mirror",         "Mirror mode"),
+]
+
+# Pick-lists, in display order: (config key, label, kind, choices).
+#   kind    — value type ("str" | "int"); tells us how to compare state and how
+#             handheld-kbd-ctl should write it.
+#   choices — [(value, child label)], or None to discover at runtime.
+# Layout's choices are None: they are read from the installed layout files, so a
+# custom layout dropped in the layouts dir shows up on its own.
+CHOICE_SETTINGS = [
+    ("layout",           "Layout",          "str", None),
+    ("position_mode",    "Position",        "str", [("bottom", "Bottom"), ("custom", "Custom")]),
+    ("suggestion_count", "Suggestions",     "int", [(2, "2"), (3, "3"), (4, "4"), (5, "5")]),
+    ("gesture_fingers",  "Gesture fingers", "int", [(1, "1 finger"), (2, "2 fingers")]),
+    ("super_icon",       "Super key icon",  "str", [("windows", "Windows"), ("arch", "Arch"), ("tux", "Tux")]),
+]
+
+# The Settings submenu and its subtree. ids: 1-8 are the top-level actions/separators;
+# 20 is Settings; 21+ its booleans; 30 the in-submenu separator; 100,200,… the
+# pick-list submenus with their children just above each base.
+SETTINGS_ID = 20
+SETTINGS_SEP = 30
+BOOL_BASE = 21
+CHOICE_BASE = 100          # menu i gets CHOICE_BASE*(i+1); its children sit just above
 
 
-def current_super_icon():
+def load_cfg():
     try:
-        return str(json.load(open(CFG)).get("super_icon", "windows")).strip().lower()
+        return json.load(open(CFG))
     except Exception:
-        return "windows"
+        return {}
+
+
+def cfg_get(key):
+    return load_cfg().get(key, DEFAULTS.get(key))
+
+
+def discover_layouts():
+    """Installed layout names (file stem), sorted; falls back to the built-ins."""
+    try:
+        names = sorted(f[:-5] for f in os.listdir(LAYOUT_DIR)
+                       if f.endswith(".json") and ".bak" not in f)
+    except Exception:
+        names = []
+    return names or ["full", "compact"]
+
+
 APP_ID = f"handheld-kbd-tray-{os.getpid()}"
 BUS_NAME = f"org.kde.StatusNotifierItem-{os.getpid()}-1"
 ITEM_PATH = "/StatusNotifierItem"
@@ -152,11 +216,34 @@ class Tray:
         6: ("Fix trackpad pointer",  "input-touchpad",         lambda: run(f"{BIN}/handheld-kbd-fix-pointer")),
         8: ("Stop keyboard",         "process-stop",           lambda: run(f"{BIN}/handheld-kbd-ctl", "stop")),
     }
-    SEPARATORS = (2, 7)
+    # Separators: 2 and 7 at the top level; 30 inside Settings (toggles | pick-lists).
+    SEPARATORS = (2, 7, SETTINGS_SEP)
+    # Top-level order. Settings takes the slot the super-icon submenu used to hold, in
+    # the config cluster after Languages, rather than sorting to the bottom by id.
+    ORDER = [1, 2, 3, 4, 5, SETTINGS_ID, 6, 7, 8]
 
     def __init__(self):
         self.bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
         self.revision = 1
+
+        # Build the Settings subtree once, assigning stable ids. Two lookup maps drive
+        # everything else: no per-setting handlers, just data.
+        self.bools = {}                       # id -> (key, label)
+        for i, (key, label) in enumerate(BOOL_SETTINGS):
+            self.bools[BOOL_BASE + i] = (key, label)
+
+        self.choice_menus = {}                # menu id -> (key, label, kind, [(cid, value, label)])
+        self.choice_children = {}             # child id -> (menu id, key, kind, value, label)
+        for i, (key, label, kind, choices) in enumerate(CHOICE_SETTINGS):
+            menu_id = CHOICE_BASE * (i + 1)
+            if choices is None:               # layout: discover installed layouts
+                choices = [(n, n.capitalize()) for n in discover_layouts()]
+            kids = []
+            for j, (value, clabel) in enumerate(choices):
+                cid = menu_id + 1 + j
+                kids.append((cid, value, clabel))
+                self.choice_children[cid] = (menu_id, key, kind, value, clabel)
+            self.choice_menus[menu_id] = (key, label, kind, kids)
 
     # ---- menu model ----
 
@@ -171,38 +258,64 @@ class Tray:
         return text
 
     @staticmethod
-    def _super_child(item_id):
-        for cid, clabel, value in SUPER_ICONS:
-            if cid == item_id:
-                return (cid, clabel, value)
-        return None
+    def _choice_selected(key, kind, value):
+        cur = cfg_get(key)
+        try:
+            if kind == "int":
+                return int(cur) == int(value)
+            return str(cur).strip().lower() == str(value).strip().lower()
+        except Exception:
+            return False
+
+    def _settings_order(self):
+        # Toggles, a separator, then the pick-list submenus. Dict insertion order is the
+        # display order for each group.
+        return list(self.bools) + [SETTINGS_SEP] + list(self.choice_menus)
 
     def _all_ids(self):
-        return (list(self.ACTIONS) + list(self.SEPARATORS)
-                + [SUPER_MENU_ID] + [c[0] for c in SUPER_ICONS])
+        return (list(self.ACTIONS) + list(self.SEPARATORS) + [SETTINGS_ID]
+                + list(self.bools) + list(self.choice_menus) + list(self.choice_children))
 
     def _known(self, item_id):
         return (item_id in self.ACTIONS or item_id in self.SEPARATORS
-                or item_id == SUPER_MENU_ID or self._super_child(item_id) is not None)
+                or item_id == SETTINGS_ID or item_id in self.bools
+                or item_id in self.choice_menus or item_id in self.choice_children)
 
     def props(self, item_id):
         if item_id in self.SEPARATORS:
             return {"type": GLib.Variant("s", "separator")}
-        if item_id == SUPER_MENU_ID:
+        if item_id == SETTINGS_ID:
             return {
-                "label": GLib.Variant("s", "Super key icon"),
+                "label": GLib.Variant("s", "Settings"),
+                "icon-name": GLib.Variant("s", "configure"),
+                "children-display": GLib.Variant("s", "submenu"),
+                "enabled": GLib.Variant("b", True),
+                "visible": GLib.Variant("b", True),
+            }
+        if item_id in self.bools:
+            key, label = self.bools[item_id]
+            return {
+                "label": GLib.Variant("s", label),
+                "toggle-type": GLib.Variant("s", "checkmark"),
+                "toggle-state": GLib.Variant("i", 1 if bool(cfg_get(key)) else 0),
+                "enabled": GLib.Variant("b", True),
+                "visible": GLib.Variant("b", True),
+            }
+        if item_id in self.choice_menus:
+            _key, label, _kind, _kids = self.choice_menus[item_id]
+            return {
+                "label": GLib.Variant("s", label),
                 "icon-name": GLib.Variant("s", "input-keyboard"),
                 "children-display": GLib.Variant("s", "submenu"),
                 "enabled": GLib.Variant("b", True),
                 "visible": GLib.Variant("b", True),
             }
-        child = self._super_child(item_id)
-        if child:
-            _cid, clabel, value = child
+        if item_id in self.choice_children:
+            _menu, key, kind, value, clabel = self.choice_children[item_id]
             return {
                 "label": GLib.Variant("s", clabel),
                 "toggle-type": GLib.Variant("s", "radio"),
-                "toggle-state": GLib.Variant("i", 1 if value == current_super_icon() else 0),
+                "toggle-state": GLib.Variant("i", 1 if self._choice_selected(key, kind, value) else 0),
                 "enabled": GLib.Variant("b", True),
                 "visible": GLib.Variant("b", True),
             }
@@ -215,19 +328,19 @@ class Tray:
         }
 
     def node(self, item_id):
-        if item_id == SUPER_MENU_ID:
-            kids = [self.node(cid) for cid, _, _ in SUPER_ICONS]
+        if item_id == SETTINGS_ID:
+            kids = [self.node(i) for i in self._settings_order()]
+            return GLib.Variant("(ia{sv}av)", (item_id, self.props(item_id), kids))
+        if item_id in self.choice_menus:
+            kids = [self.node(cid) for cid, _, _ in self.choice_menus[item_id][3]]
             return GLib.Variant("(ia{sv}av)", (item_id, self.props(item_id), kids))
         return GLib.Variant("(ia{sv}av)", (item_id, self.props(item_id), []))
 
-    # Explicit order so the submenu lands in the config cluster (after Languages),
-    # instead of sorting to the bottom by numeric id.
-    ORDER = [1, 2, 3, 4, 5, SUPER_MENU_ID, 6, 7, 8]
-
     def layout(self, parent_id=0):
         # dbusmenu asks for the tree rooted at parent_id — Plasma requests the whole
-        # menu (0) and then the submenu (9) separately when it expands. Returning the
-        # root for a submenu request left the submenu empty and unclickable.
+        # menu (0) and then each submenu separately when it expands. Returning the root
+        # for a submenu request left the submenu empty and unclickable. node() nests its
+        # children, so a request for Settings brings the whole subtree with it.
         if parent_id != 0:
             return self.node(parent_id)
         kids = [self.node(i) for i in self.ORDER]
@@ -273,24 +386,32 @@ class Tray:
             item_id, event_id = params.unpack()[0], params.unpack()[1]
             inv.return_value(None)
             if event_id == "clicked":
-                if item_id in self.ACTIONS:
-                    self.ACTIONS[item_id][2]()
-                    # State changes after every one of these, so the next open re-reads it.
-                    GLib.timeout_add_seconds(1, self.refresh)
-                else:
-                    child = self._super_child(item_id)
-                    if child:
-                        run(f"{BIN}/handheld-kbd-ctl", "super-icon", child[2])
-                        # Reflect the new radio selection on the next open.
-                        GLib.timeout_add_seconds(1, self.refresh)
+                self.on_clicked(item_id)
             return
         elif method == "AboutToShow":
-            # Labels depend on whether the keyboard is up and shown right now.
+            # Labels and toggle states depend on the live config and whether the
+            # keyboard is up right now.
             inv.return_value(GLib.Variant("(b)", (True,)))
             self.refresh()
             return
         else:
             inv.return_value(None)
+
+    def on_clicked(self, item_id):
+        if item_id in self.ACTIONS:
+            self.ACTIONS[item_id][2]()
+        elif item_id in self.bools:
+            key, _ = self.bools[item_id]
+            new = "false" if bool(cfg_get(key)) else "true"
+            run(f"{BIN}/handheld-kbd-ctl", "set", key, new, "bool")
+        elif item_id in self.choice_children:
+            _menu, key, kind, value, _label = self.choice_children[item_id]
+            run(f"{BIN}/handheld-kbd-ctl", "set", key, str(value), kind)
+        else:
+            return
+        # State changes after every one of these (config written, keyboard restarted),
+        # so re-read it on the next open.
+        GLib.timeout_add_seconds(1, self.refresh)
 
     def on_menu_get(self, conn, sender, path, iface, prop):
         return {
