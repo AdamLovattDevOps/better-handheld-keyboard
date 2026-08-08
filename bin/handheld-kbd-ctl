@@ -30,7 +30,7 @@ export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 # not a session. Re-run ourselves in a transient unit of our own, which nothing here stops.
 if [ -z "${HK_DETACHED:-}" ] && command -v systemd-run >/dev/null 2>&1; then
     case "${1:-restart}" in
-        start|stop|restart)
+        start|stop|restart|super-icon)
             if grep -qs 'handheld-kbd' /proc/self/cgroup; then
                 exec systemd-run --user --collect --quiet --pipe \
                      --unit="handheld-kbd-ctl-$$" --setenv=HK_DETACHED=1 \
@@ -138,8 +138,31 @@ PY
             echo "position reset; it applies next time the keyboard starts."
         fi
         ;;
+    super-icon)
+        # Set which OS logo the super/meta key wears, then restart so it re-renders.
+        icon="${2:-}"
+        case "$icon" in
+            windows|arch|tux) ;;
+            *) echo "usage: handheld-kbd-ctl super-icon {windows|arch|tux}" >&2; exit 2 ;;
+        esac
+        python3 - "$icon" <<'PY'
+import json, os, sys
+p = os.path.expanduser("~/.config/handheld-kbd/config.json")
+try:
+    c = json.load(open(p))
+except Exception:
+    c = {}
+c["super_icon"] = sys.argv[1]
+os.makedirs(os.path.dirname(p), exist_ok=True)
+json.dump(c, open(p, "w"), indent=2)
+PY
+        stop_all
+        start_all
+        running "$KBD_PAT" && echo "super key icon set to $icon." \
+            || { echo "icon set; keyboard did not come back — see /tmp/handheld-kbd-out.log" >&2; exit 1; }
+        ;;
     *)
-        echo "usage: handheld-kbd-ctl [status|start|stop|restart|reset]" >&2
+        echo "usage: handheld-kbd-ctl [status|start|stop|restart|reset|super-icon <windows|arch|tux>]" >&2
         exit 2
         ;;
 esac

@@ -7,6 +7,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 BIN="$HOME/.local/bin"
 CFG="$HOME/.config/handheld-kbd"
+SHARE="$HOME/.local/share/handheld-kbd"
 KWIN="$HOME/.local/share/kwin/scripts/handheld-kbd-opacity"
 AUTO="$HOME/.config/autostart"
 RULE_UUID="a8a95de3-82aa-4998-87c0-125fb8525143"
@@ -99,6 +100,12 @@ FRESH=0
 if [ ! -f "$CFG/config.json" ]; then install -m644 "$HERE/config/config.json" "$CFG/config.json"; FRESH=1; fi
 for f in "$HERE"/config/layouts/*.json; do
   d="$CFG/layouts/$(basename "$f")"; [ -f "$d" ] || install -m644 "$f" "$d"
+done
+
+# --- super-key logos (app assets, not user config — always refresh on upgrade) ---
+mkdir -p "$SHARE/icons/super"
+for f in "$HERE"/assets/super/*.svg; do
+  [ -e "$f" ] && install -m644 "$f" "$SHARE/icons/super/$(basename "$f")"
 done
 
 # --- upgrade an existing install: add new keys, drop retired settings ---

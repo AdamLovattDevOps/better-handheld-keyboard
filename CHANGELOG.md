@@ -9,6 +9,22 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.0.13 — Pick your super key
+
+The super/meta key can now wear the logo of your choice — Windows, Arch, or Tux — set
+live from the tray, with no relogin.
+
+### Added
+
+- **Customisable super-key icon.** The ⊞ key can now show a **Windows**, **Arch Linux**,
+  or **Tux** logo. Pick it from the system-tray menu (**Super key icon**, a radio submenu
+  that shows the current choice), or from the command line with
+  `handheld-kbd-ctl super-icon {windows|arch|tux}` — the keyboard restarts and the new face
+  applies right away. Controlled by the `super_icon` config key (default `windows`). The
+  logos ship as SVGs installed to `~/.local/share/handheld-kbd/icons/super/` and are
+  rendered scaled onto the key; if the chosen icon is ever missing the key falls back to its
+  `⊞` text, so it can never come up blank.
+
 ## v1.0.12 — The pointer survives every trigger mode
 
 Verified on both machines before tagging: on a Legion Go 2 (`mirror: false`), opening
