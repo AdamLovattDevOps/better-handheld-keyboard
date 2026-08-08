@@ -12,6 +12,7 @@ package, so a dependency here is a dependency that cannot be installed.
     handheld-kbd-tray            run it (normally started by autostart)
 """
 import fcntl
+import json
 import os
 import signal
 import subprocess
@@ -22,6 +23,18 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gio, GLib     # noqa: E402
 
 BIN = os.path.expanduser("~/.local/bin")
+CFG = os.path.expanduser("~/.config/handheld-kbd/config.json")
+
+# The "Super key icon" submenu: (item id, menu label, config value).
+SUPER_ICONS = [(10, "Windows", "windows"), (11, "Arch", "arch"), (12, "Tux", "tux")]
+SUPER_MENU_ID = 9
+
+
+def current_super_icon():
+    try:
+        return str(json.load(open(CFG)).get("super_icon", "windows")).strip().lower()
+    except Exception:
+        return "windows"
 APP_ID = f"handheld-kbd-tray-{os.getpid()}"
 BUS_NAME = f"org.kde.StatusNotifierItem-{os.getpid()}-1"
 ITEM_PATH = "/StatusNotifierItem"
@@ -157,9 +170,42 @@ class Tray:
             return "Start keyboard"
         return text
 
+    @staticmethod
+    def _super_child(item_id):
+        for cid, clabel, value in SUPER_ICONS:
+            if cid == item_id:
+                return (cid, clabel, value)
+        return None
+
+    def _all_ids(self):
+        return (list(self.ACTIONS) + list(self.SEPARATORS)
+                + [SUPER_MENU_ID] + [c[0] for c in SUPER_ICONS])
+
+    def _known(self, item_id):
+        return (item_id in self.ACTIONS or item_id in self.SEPARATORS
+                or item_id == SUPER_MENU_ID or self._super_child(item_id) is not None)
+
     def props(self, item_id):
         if item_id in self.SEPARATORS:
             return {"type": GLib.Variant("s", "separator")}
+        if item_id == SUPER_MENU_ID:
+            return {
+                "label": GLib.Variant("s", "Super key icon"),
+                "icon-name": GLib.Variant("s", "input-keyboard"),
+                "children-display": GLib.Variant("s", "submenu"),
+                "enabled": GLib.Variant("b", True),
+                "visible": GLib.Variant("b", True),
+            }
+        child = self._super_child(item_id)
+        if child:
+            _cid, clabel, value = child
+            return {
+                "label": GLib.Variant("s", clabel),
+                "toggle-type": GLib.Variant("s", "radio"),
+                "toggle-state": GLib.Variant("i", 1 if value == current_super_icon() else 0),
+                "enabled": GLib.Variant("b", True),
+                "visible": GLib.Variant("b", True),
+            }
         label, icon, _ = self.ACTIONS[item_id]
         return {
             "label": GLib.Variant("s", self.label(item_id)),
@@ -169,10 +215,17 @@ class Tray:
         }
 
     def node(self, item_id):
+        if item_id == SUPER_MENU_ID:
+            kids = [self.node(cid) for cid, _, _ in SUPER_ICONS]
+            return GLib.Variant("(ia{sv}av)", (item_id, self.props(item_id), kids))
         return GLib.Variant("(ia{sv}av)", (item_id, self.props(item_id), []))
 
+    # Explicit order so the submenu lands in the config cluster (after Languages),
+    # instead of sorting to the bottom by numeric id.
+    ORDER = [1, 2, 3, 4, 5, SUPER_MENU_ID, 6, 7, 8]
+
     def layout(self):
-        kids = [self.node(i) for i in sorted(list(self.ACTIONS) + list(self.SEPARATORS))]
+        kids = [self.node(i) for i in self.ORDER]
         root = {"children-display": GLib.Variant("s", "submenu")}
         return GLib.Variant("(ia{sv}av)", (0, root, kids))
 
@@ -203,10 +256,9 @@ class Tray:
                 GLib.Variant("u", self.revision), self.layout()))
         elif method == "GetGroupProperties":
             ids = params.unpack()[0]
-            wanted = ids or sorted(list(self.ACTIONS) + list(self.SEPARATORS))
+            wanted = ids or self._all_ids()
             inv.return_value(GLib.Variant("(a(ia{sv}))", ([
-                (i, self.props(i)) for i in wanted
-                if i in self.ACTIONS or i in self.SEPARATORS], )))
+                (i, self.props(i)) for i in wanted if self._known(i)], )))
         elif method == "GetProperty":
             item_id, name = params.unpack()
             value = self.props(item_id).get(name, GLib.Variant("s", ""))
@@ -214,10 +266,17 @@ class Tray:
         elif method == "Event":
             item_id, event_id = params.unpack()[0], params.unpack()[1]
             inv.return_value(None)
-            if event_id == "clicked" and item_id in self.ACTIONS:
-                self.ACTIONS[item_id][2]()
-                # State changes after every one of these, so the next open re-reads it.
-                GLib.timeout_add_seconds(1, self.refresh)
+            if event_id == "clicked":
+                if item_id in self.ACTIONS:
+                    self.ACTIONS[item_id][2]()
+                    # State changes after every one of these, so the next open re-reads it.
+                    GLib.timeout_add_seconds(1, self.refresh)
+                else:
+                    child = self._super_child(item_id)
+                    if child:
+                        run(f"{BIN}/handheld-kbd-ctl", "super-icon", child[2])
+                        # Reflect the new radio selection on the next open.
+                        GLib.timeout_add_seconds(1, self.refresh)
             return
         elif method == "AboutToShow":
             # Labels depend on whether the keyboard is up and shown right now.

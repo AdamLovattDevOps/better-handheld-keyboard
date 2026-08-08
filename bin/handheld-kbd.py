@@ -13,11 +13,15 @@ If any JSON is missing/invalid, built-in defaults are used so it always comes up
 """
 import gi, sys, time, os, signal, json, subprocess, math, re
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk, GLib, Pango
+from gi.repository import Gtk, Gdk, GLib, Pango, GdkPixbuf
 from evdev import UInput, ecodes as e
 GLib.set_prgname("handheld-kbd")   # app_id so the KWin window-rule can match us
 
 CFG_DIR = os.path.expanduser("~/.config/handheld-kbd")
+# Installed data (icons, learned dict). The installer drops the super-key logos in
+# icons/super/{windows,arch,tux}.svg here.
+SHARE_DIR = os.path.expanduser("~/.local/share/handheld-kbd")
+SUPER_ICON_DIR = os.path.join(SHARE_DIR, "icons", "super")
 
 # Game Mode (gamescope): render as a transparent, input-capable external overlay
 # instead of a KWin window. Enabled by the daemon when it detects gamescope.
@@ -26,6 +30,10 @@ GS_DISPLAY = os.environ.get("HANDHELD_KBD_GS_DISPLAY", os.environ.get("DISPLAY",
 
 DEFAULT_CONFIG = {
     "layout": "full", "locale": "auto", "opacity": 0.72,
+    # Which OS logo the super/meta key wears: "windows" | "arch" | "tux".
+    # Rendered from icons/super/<name>.svg; falls back to the ⊞ glyph if missing.
+    # Change it live from the tray ("Super key icon") or: handheld-kbd-ctl super-icon <name>.
+    "super_icon": "windows",
     # Transparency cycle: an opacity key (kind "opacity") steps through these values
     # (opaque → most transparent, then wraps). Persisted live, applied via the KWin script.
     "opacity_steps": [1.0, 0.85, 0.7, 0.55, 0.4, 0.25],
@@ -134,6 +142,29 @@ def load_config():
     except Exception as ex:
         print(f"handheld-kbd: using default config ({ex})", file=sys.stderr)
         return dict(DEFAULT_CONFIG)
+
+
+def apply_super_icon(config, button, kh):
+    """Put the chosen OS logo (config['super_icon']) on the super/meta key.
+
+    Renders icons/super/<name>.svg scaled to the key. Anything unset/unknown/missing
+    is a no-op, so the key keeps its text face (⊞) — it must never come up blank.
+    """
+    name = str(config.get("super_icon", "windows") or "").strip().lower()
+    if name in ("", "none", "glyph", "default"):
+        return
+    path = os.path.join(SUPER_ICON_DIR, name + ".svg")
+    if not os.path.exists(path):
+        return
+    try:
+        size = max(20, int(kh * 0.55))
+        pix = GdkPixbuf.Pixbuf.new_from_file_at_size(path, size, size)
+        img = Gtk.Image.new_from_pixbuf(pix)
+        button.set_image(img)
+        button.set_always_show_image(True)
+        button.set_label("")        # image only; drop the ⊞ text
+    except Exception as ex:
+        print(f"handheld-kbd: super icon '{name}' failed ({ex})", file=sys.stderr)
 
 
 def load_layout(name):
@@ -365,6 +396,8 @@ class OSK(Gtk.Window):
                 else:
                     b.connect("clicked", self.on_key, kc)
                     self.keybtns.append((b, name, label, shifted))
+                if name == "KEY_LEFTMETA":
+                    apply_super_icon(config, b, kh)
                 grid.attach(b, col, ri, sp, 1)
                 col += sp
         self._init_prediction(rows)
