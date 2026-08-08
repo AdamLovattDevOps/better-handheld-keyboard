@@ -224,7 +224,12 @@ class Tray:
     # instead of sorting to the bottom by numeric id.
     ORDER = [1, 2, 3, 4, 5, SUPER_MENU_ID, 6, 7, 8]
 
-    def layout(self):
+    def layout(self, parent_id=0):
+        # dbusmenu asks for the tree rooted at parent_id — Plasma requests the whole
+        # menu (0) and then the submenu (9) separately when it expands. Returning the
+        # root for a submenu request left the submenu empty and unclickable.
+        if parent_id != 0:
+            return self.node(parent_id)
         kids = [self.node(i) for i in self.ORDER]
         root = {"children-display": GLib.Variant("s", "submenu")}
         return GLib.Variant("(ia{sv}av)", (0, root, kids))
@@ -252,8 +257,9 @@ class Tray:
 
     def on_menu_call(self, conn, sender, path, iface, method, params, inv):
         if method == "GetLayout":
+            parent_id = params.unpack()[0]
             inv.return_value(GLib.Variant.new_tuple(
-                GLib.Variant("u", self.revision), self.layout()))
+                GLib.Variant("u", self.revision), self.layout(parent_id)))
         elif method == "GetGroupProperties":
             ids = params.unpack()[0]
             wanted = ids or self._all_ids()
