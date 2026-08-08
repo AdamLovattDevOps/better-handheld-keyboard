@@ -9,6 +9,32 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.0.15 — Configure it all from the tray
+
+The system-tray menu grows a **Settings** submenu that exposes every configurable that
+maps cleanly onto a menu — the on/off toggles and the short pick-lists — so the common
+tweaks no longer mean editing `config.json` by hand.
+
+### Added
+
+- **Settings submenu in the tray.** Under a new **Settings ▸** entry (where "Super key
+  icon" used to sit), toggle **Prediction**, **Learn words**, **Glide (swipe) typing**,
+  **Swipe-up summon**, **Start in big mode** and **Mirror mode** with a
+  checkmark; and pick from **Layout** (discovered from the installed layouts, so custom
+  ones appear on their own), **Position** (Bottom / Custom), **Suggestions** (2–5),
+  **Gesture fingers** (1 / 2) and **Super key icon** (Windows / Arch / Tux). Each shows its
+  current state and applies on click — the config is written and the keyboard restarts, the
+  same way the super-key icon already did.
+- **`handheld-kbd-ctl set <key> <value> [bool|int|float|str]`.** The generic config setter
+  that backs the Settings menu, also usable from the command line — e.g.
+  `handheld-kbd-ctl set prediction false bool` or `handheld-kbd-ctl set layout compact str`.
+  It writes one key and restarts the keyboard. (The older `super-icon` subcommand still
+  works.)
+
+Numeric, colour and geometry settings stay in `config.json` and on the on-keyboard keys
+(the move/lock/reset and opacity/size keys), where a slider or a coordinate makes sense and
+a tray radio does not.
+
 ## v1.0.14 — Sharper super-key logos
 
 Follow-up to v1.0.13: the Windows and Arch super-key icons are now accurate marks
