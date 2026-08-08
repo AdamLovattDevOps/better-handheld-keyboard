@@ -38,8 +38,7 @@ LAYOUT_DIR = os.path.expanduser("~/.config/handheld-kbd/layouts")
 # file still shows the right state (the keyboard fills these in the same way).
 DEFAULTS = {
     "prediction": True, "predict_learn": True, "swipe": True,
-    "show_on_focus": False, "gesture_summon": False, "start_big": False,
-    "mirror": True,
+    "gesture_summon": False, "start_big": False, "mirror": True,
     "layout": "full", "position_mode": "bottom",
     "suggestion_count": 3, "gesture_fingers": 2, "super_icon": "windows",
 }
@@ -49,7 +48,6 @@ BOOL_SETTINGS = [
     ("prediction",     "Prediction"),
     ("predict_learn",  "Learn words"),
     ("swipe",          "Glide (swipe) typing"),
-    ("show_on_focus",  "Show on focus"),
     ("gesture_summon", "Swipe-up summon"),
     ("start_big",      "Start in big mode"),
     ("mirror",         "Mirror mode"),

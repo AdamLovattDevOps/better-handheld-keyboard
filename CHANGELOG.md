@@ -19,7 +19,7 @@ tweaks no longer mean editing `config.json` by hand.
 
 - **Settings submenu in the tray.** Under a new **Settings ▸** entry (where "Super key
   icon" used to sit), toggle **Prediction**, **Learn words**, **Glide (swipe) typing**,
-  **Show on focus**, **Swipe-up summon**, **Start in big mode** and **Mirror mode** with a
+  **Swipe-up summon**, **Start in big mode** and **Mirror mode** with a
   checkmark; and pick from **Layout** (discovered from the installed layouts, so custom
   ones appear on their own), **Position** (Bottom / Custom), **Suggestions** (2–5),
   **Gesture fingers** (1 / 2) and **Super key icon** (Windows / Arch / Tux). Each shows its
