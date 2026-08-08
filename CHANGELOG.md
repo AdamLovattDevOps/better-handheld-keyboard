@@ -9,6 +9,18 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.0.14 — Sharper super-key logos
+
+Follow-up to v1.0.13: the Windows and Arch super-key icons are now accurate marks
+instead of the first hand-drawn outlines.
+
+### Changed
+
+- **Accurate Windows and Arch super-key icons.** The Arch icon is now the real Arch
+  Linux logo, and the Windows icon is a clean flat square-set; both are white to match
+  the key labels and the same filled style as Tux. No config change — if `super_icon`
+  is `arch` or `windows`, the new art just replaces the old on upgrade.
+
 ## v1.0.13 — Pick your super key
 
 The super/meta key can now wear the logo of your choice — Windows, Arch, or Tux — set
