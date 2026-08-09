@@ -9,6 +9,21 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.0.17 — Aligned arrows, see-through keyboard
+
+### Fixed
+
+- **The arrow keys line up.** `↑` now sits directly above `↓` — a proper inverted-T
+  with `←` and `→` either side — in both the normal and the split keyboard. Spacer
+  cells in the layout hold the arrows in their column no matter how long the row is.
+
+### Changed
+
+- **The whole keyboard is see-through.** In desktop mode only the key tiles paint
+  now; the window itself is transparent, so the space between and around the keys
+  shows the desktop through instead of a grey slab. The split keyboard already did
+  this — the normal keyboard now matches, so it's just as space-efficient.
+
 ## v1.0.16 — Split keyboard
 
 A split-keyboard mode for thumb-typing while you grip the device: the keyboard

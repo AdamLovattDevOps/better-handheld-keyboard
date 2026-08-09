@@ -317,8 +317,17 @@
         "shifted": "?"
       },
       {
+        "kind": "blank"
+      },
+      {
         "label": "↑",
         "key": "KEY_UP"
+      },
+      {
+        "kind": "blank"
+      },
+      {
+        "kind": "blank"
       }
     ],
     [
