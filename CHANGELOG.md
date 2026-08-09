@@ -11,19 +11,30 @@ The heading must be `## v<version> — <title>` and the version must match the t
 
 ## v1.0.16 — Split keyboard
 
-A split-keyboard mode for thumb-typing while you grip the device: each row's two
-halves slide out to the left and right edges of the window with a clear gap down
-the middle, instead of one solid block across the bottom.
+A split-keyboard mode for thumb-typing while you grip the device: the keyboard
+breaks into two distinct halves at the left and right edges with a clean, empty
+channel down the middle. The tray's Settings menu is also reorganised into
+labelled groups.
 
 ### Added
 
-- **Split keyboard.** Set `split: true` and every row is cut at its own midpoint —
-  the left half hugs the left edge, the right half hugs the right edge, and an
-  empty gap opens between them so each thumb reaches its own side. It works over
-  *any* layout (full, compact or a custom one); the keys shrink a touch to make
-  room for the gap. `split_gap` controls the gap width in grid units (default `6`,
-  ≈ three keys). Toggle it live from the tray under **Settings ▸ Split keyboard**,
-  or with `handheld-kbd-ctl set split true` — no relogin.
+- **Split keyboard.** Set `split: true` and every row is cut at its midpoint into
+  two halves. Both halves' inner edges snap to a fixed seam, so the empty channel
+  between them is the same width on every row — it reads as two separate keyboards,
+  not one keyboard with a ragged hole. It works over *any* layout (full, compact or
+  a custom one); the keys shrink a touch to make room. `split_gap` controls the
+  channel width in grid units (default `6`, ≈ three keys). Toggle it live from the
+  tray under **Settings ▸ Split keyboard**, or with `handheld-kbd-ctl set split
+  true` — no relogin.
+
+### Changed
+
+- **The tray Settings menu is grouped.** Instead of one flat list of toggles and
+  pick-lists, the settings now sit under captioned headings — **Typing**
+  (prediction, learn words, suggestions, glide typing), **Layout & appearance**
+  (layout, super-key icon, split, big mode, position) and **Summoning & input**
+  (mirror mode, swipe-up summon, gesture fingers) — divided by separators, so
+  related settings are together.
 
 ## v1.0.15 — Configure it all from the tray
 

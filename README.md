@@ -64,7 +64,8 @@ So I built the keyboard I wanted instead. Here's what it does differently:
 - **A tray icon.** Tap to show or hide; right-click for restart, reset position, fix the
   trackpad pointer, stop and start — and a **Settings** submenu that toggles prediction,
   glide typing and the rest, and picks the layout, super-key icon,
-  suggestion count and more, without touching `config.json`.
+  suggestion count and more, without touching `config.json`. The settings are grouped
+  under **Typing**, **Layout & appearance** and **Summoning & input** headings.
 - **Shortcuts for when it goes wrong.** The same actions appear in the application menu —
   clickable, because typing is the one thing you can't do when the keyboard is the
   problem.

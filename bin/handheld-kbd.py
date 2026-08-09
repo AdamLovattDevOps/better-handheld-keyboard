@@ -351,31 +351,48 @@ class OSK(Gtk.Window):
         SPAN = {'': 2, 'wide': 3, 'mod': 3, 'space': 8, 'locale': 2, 'hide': 2, 'reset': 2, 'size': 2, 'opacity': 2}
         row_units = [sum(SPAN.get(k[2], 2) for k in row) for row in rows]
         maxu = max(row_units) if row_units else 1
-        # Split mode widens the unit grid by a central gap and shoves each row's two
-        # halves out to the edges; otherwise every row is simply centred on maxu units.
+        # Split mode: cut every row in two and lay the halves out as two distinct
+        # keyboards separated by a clean, empty channel down the middle.
         self.split = bool(config.get("split", False))
         gap = max(0, int(config.get("split_gap", 6))) if self.split else 0
-        total_u = maxu + gap
         # Pass 1 — decide each key's starting column: (row_index, col, key_tuple).
         placements = []
-        for ri, row in enumerate(rows):
-            if self.split and len(row) > 1:
-                # Cut the row at its own unit-midpoint: left half hugs the left edge,
-                # right half hugs the right edge, the gap falls in between.
-                half, acc, idx = row_units[ri] / 2.0, 0, len(row)
-                for j, k in enumerate(row):
-                    acc += SPAN.get(k[2], 2)
-                    if acc >= half:
-                        idx = max(1, j + 1); break
-                left, right = row[:idx], row[idx:]
+        gap_col = gap_w = 0        # the empty channel's column span, for the spacer below
+        if self.split:
+            # Cut each row at its unit-midpoint into a left and right half. The two
+            # halves' INNER edges both snap to a fixed seam, so the gap between them is
+            # the same width on every row — a crisp rectangular channel, not a ragged
+            # one. Left halves are right-aligned to the seam, right halves left-aligned
+            # after it; the outer edges fall where the row length puts them (as on any
+            # keyboard, where the rows aren't all the same length).
+            splits = []                       # (left_keys, right_keys, left_units, right_units)
+            for row in rows:
+                if len(row) > 1:
+                    tot, acc, idx = sum(SPAN.get(k[2], 2) for k in row), 0, len(row)
+                    for j, k in enumerate(row):
+                        acc += SPAN.get(k[2], 2)
+                        if acc >= tot / 2.0:
+                            idx = max(1, j + 1); break
+                    left, right = row[:idx], row[idx:]
+                else:
+                    left, right = row, []
+                lu = sum(SPAN.get(k[2], 2) for k in left)
                 ru = sum(SPAN.get(k[2], 2) for k in right)
-                col = 0
+                splits.append((left, right, lu, ru))
+            leftmax = max((s[2] for s in splits), default=1)
+            rightmax = max((s[3] for s in splits), default=1)
+            total_u = leftmax + gap + rightmax
+            gap_col, gap_w = leftmax, gap
+            for ri, (left, right, lu, ru) in enumerate(splits):
+                col = leftmax - lu            # right-align the left half to the seam
                 for k in left:
                     placements.append((ri, col, k)); col += SPAN.get(k[2], 2)
-                col = total_u - ru
+                col = leftmax + gap           # left-align the right half after the gap
                 for k in right:
                     placements.append((ri, col, k)); col += SPAN.get(k[2], 2)
-            else:
+        else:
+            total_u = maxu
+            for ri, row in enumerate(rows):
                 col = (total_u - row_units[ri]) // 2   # centre each row on the unit grid
                 for k in row:
                     placements.append((ri, col, k)); col += SPAN.get(k[2], 2)
@@ -435,6 +452,12 @@ class OSK(Gtk.Window):
                 if name == "KEY_LEFTMETA":
                     apply_super_icon(config, b, kh)
                 grid.attach(b, col, ri, sp, 1)
+        # GtkGrid gives zero width to columns that are empty on *every* row, which would
+        # collapse the split channel. An invisible spacer spanning the gap keeps it open.
+        if self.split and gap_w > 0:
+            spacer = Gtk.Box()
+            spacer.set_can_focus(False)
+            grid.attach(spacer, gap_col, 0, gap_w, self.nrows)
         self._init_prediction(rows)
         # Drag/resize bar, hidden until the move key unlocks the keyboard.
         self.handle = self._build_handle()
