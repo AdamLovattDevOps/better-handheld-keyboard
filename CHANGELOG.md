@@ -9,6 +9,22 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.0.16 — Split keyboard
+
+A split-keyboard mode for thumb-typing while you grip the device: each row's two
+halves slide out to the left and right edges of the window with a clear gap down
+the middle, instead of one solid block across the bottom.
+
+### Added
+
+- **Split keyboard.** Set `split: true` and every row is cut at its own midpoint —
+  the left half hugs the left edge, the right half hugs the right edge, and an
+  empty gap opens between them so each thumb reaches its own side. It works over
+  *any* layout (full, compact or a custom one); the keys shrink a touch to make
+  room for the gap. `split_gap` controls the gap width in grid units (default `6`,
+  ≈ three keys). Toggle it live from the tray under **Settings ▸ Split keyboard**,
+  or with `handheld-kbd-ctl set split true` — no relogin.
+
 ## v1.0.15 — Configure it all from the tray
 
 The system-tray menu grows a **Settings** submenu that exposes every configurable that

@@ -41,6 +41,10 @@ So I built the keyboard I wanted instead. Here's what it does differently:
 - **Two sizes.** The ⤢ key toggles between the normal keyboard and a taller one
   with bigger keys — thumbs on a 7-inch panel, or precision when you're docked.
   Toggles live, no relogin.
+- **Split keyboard.** Turn on `split` (tray **Settings ▸ Split keyboard**, or
+  `handheld-kbd-ctl set split true`) and each row's two halves slide out to the
+  left and right edges with a clear gap down the middle — thumb-typing while you
+  grip the device. Works over any layout; `split_gap` sets the gap width.
 - **Cycle transparency from the keyboard.** The ◐ key steps through
   `opacity_steps` instead of making you edit JSON to see what's underneath.
 - **Same place on every device.** It docks flush with the bottom edge, full

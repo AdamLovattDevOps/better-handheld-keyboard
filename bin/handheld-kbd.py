@@ -68,6 +68,14 @@ DEFAULT_CONFIG = {
     # size, a drag bar appears, and you put it where you want. Pressing it again locks it
     # exactly there — it does not move the window — and saves the spot as `geometry`.
     "handle_height": 30,
+    # Split keyboard: push each row's two halves out to the left and right edges of the
+    # window with an empty gap down the middle, so you can thumb-type while gripping the
+    # device. Works over ANY layout — each row is cut at its own midpoint. The keys shrink
+    # a little to make room for the gap. Toggle live from the tray ("Split keyboard") or
+    # `handheld-kbd-ctl set split true`. `split_gap` is the middle gap width in grid units
+    # (a normal letter key is 2 units), so 6 ≈ three keys of clear space.
+    "split": False,
+    "split_gap": 6,
     # "mirror": true  → the device's keyboard button summons us (via Steam's OSK).
     # "mirror": false → seamless mode: the daemon remaps the hardware keyboard button
     #                   (via InputPlumber) to fire dbus_trigger, which we listen for
@@ -343,14 +351,42 @@ class OSK(Gtk.Window):
         SPAN = {'': 2, 'wide': 3, 'mod': 3, 'space': 8, 'locale': 2, 'hide': 2, 'reset': 2, 'size': 2, 'opacity': 2}
         row_units = [sum(SPAN.get(k[2], 2) for k in row) for row in rows]
         maxu = max(row_units) if row_units else 1
+        # Split mode widens the unit grid by a central gap and shoves each row's two
+        # halves out to the edges; otherwise every row is simply centred on maxu units.
+        self.split = bool(config.get("split", False))
+        gap = max(0, int(config.get("split_gap", 6))) if self.split else 0
+        total_u = maxu + gap
+        # Pass 1 — decide each key's starting column: (row_index, col, key_tuple).
+        placements = []
+        for ri, row in enumerate(rows):
+            if self.split and len(row) > 1:
+                # Cut the row at its own unit-midpoint: left half hugs the left edge,
+                # right half hugs the right edge, the gap falls in between.
+                half, acc, idx = row_units[ri] / 2.0, 0, len(row)
+                for j, k in enumerate(row):
+                    acc += SPAN.get(k[2], 2)
+                    if acc >= half:
+                        idx = max(1, j + 1); break
+                left, right = row[:idx], row[idx:]
+                ru = sum(SPAN.get(k[2], 2) for k in right)
+                col = 0
+                for k in left:
+                    placements.append((ri, col, k)); col += SPAN.get(k[2], 2)
+                col = total_u - ru
+                for k in right:
+                    placements.append((ri, col, k)); col += SPAN.get(k[2], 2)
+            else:
+                col = (total_u - row_units[ri]) // 2   # centre each row on the unit grid
+                for k in row:
+                    placements.append((ri, col, k)); col += SPAN.get(k[2], 2)
         grid = Gtk.Grid()
         self.grid = grid
         grid.set_column_homogeneous(True)
-        grid.set_halign(Gtk.Align.CENTER)
+        grid.set_halign(Gtk.Align.FILL if self.split else Gtk.Align.CENTER)
         grid.set_margin_top(4); grid.set_margin_bottom(4)
-        for ri, row in enumerate(rows):
-            col = (maxu - row_units[ri]) // 2          # centre each row on the unit grid
-            for (label, kc, kind, shifted, name) in row:
+        # Pass 2 — build each key at its assigned column.
+        for (ri, col, key) in placements:
+                (label, kc, kind, shifted, name) = key
                 sp = SPAN.get(kind, 2)
                 b = Gtk.Button(label=label)
                 # A label must never dictate the window's size. The grid is
@@ -399,7 +435,6 @@ class OSK(Gtk.Window):
                 if name == "KEY_LEFTMETA":
                     apply_super_icon(config, b, kh)
                 grid.attach(b, col, ri, sp, 1)
-                col += sp
         self._init_prediction(rows)
         # Drag/resize bar, hidden until the move key unlocks the keyboard.
         self.handle = self._build_handle()
@@ -937,7 +972,7 @@ class OSK(Gtk.Window):
         stretches to fill the whole window (both axes) so no screen space is wasted."""
         big = self.big
         # Grid fill behaviour: big → keys expand to fill; normal → tidy centred cluster.
-        self.grid.set_halign(Gtk.Align.FILL if big else Gtk.Align.CENTER)
+        self.grid.set_halign(Gtk.Align.FILL if (big or self.split) else Gtk.Align.CENTER)
         self.grid.set_valign(Gtk.Align.FILL)
         self.grid.set_row_homogeneous(big)
         # In Desktop big mode the resized window + row_homogeneous drive key height, so
