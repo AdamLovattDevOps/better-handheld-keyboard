@@ -18,14 +18,16 @@ labelled groups.
 
 ### Added
 
-- **Split keyboard.** Set `split: true` and the keyboard breaks into two panels,
-  each pushed flush to a screen edge, with a wide empty gap down the middle for
-  thumb-typing while you grip the device. The window goes transparent, so the gap
-  (and the space around the panels) is truly empty — the desktop shows through —
-  rather than a translucent slab; only the two panels carry a background. It works
-  over *any* layout (full, compact or a custom one). Toggle it live from the tray
-  under **Settings ▸ Split keyboard**, or with `handheld-kbd-ctl set split true` —
-  no relogin.
+- **Split keyboard.** Set `split: true` and the keyboard breaks into two compact
+  key clusters pushed to the left and right screen edges, with a wide empty gap
+  down the middle for thumb-typing while you grip the device. The window goes fully
+  transparent — only the key tiles paint — so the gap, the space between keys and
+  the space around the clusters all show the desktop through, rather than a grey
+  slab. It works over *any* layout (full, compact or a custom one). Two knobs size
+  it: `split_key_w` (key width in px, default `52` — smaller keys give a bigger
+  gap) and `split_gap` (the minimum middle width in px, default `140`). Toggle it
+  live from the tray under **Settings ▸ Split keyboard**, or with `handheld-kbd-ctl
+  set split true` — no relogin.
 
 ### Changed
 
