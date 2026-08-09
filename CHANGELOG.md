@@ -18,14 +18,14 @@ labelled groups.
 
 ### Added
 
-- **Split keyboard.** Set `split: true` and every row is cut at its midpoint into
-  two halves. Both halves' inner edges snap to a fixed seam, so the empty channel
-  between them is the same width on every row — it reads as two separate keyboards,
-  not one keyboard with a ragged hole. It works over *any* layout (full, compact or
-  a custom one); the keys shrink a touch to make room. `split_gap` controls the
-  channel width in grid units (default `6`, ≈ three keys). Toggle it live from the
-  tray under **Settings ▸ Split keyboard**, or with `handheld-kbd-ctl set split
-  true` — no relogin.
+- **Split keyboard.** Set `split: true` and the keyboard breaks into two panels,
+  each pushed flush to a screen edge, with a wide empty gap down the middle for
+  thumb-typing while you grip the device. The window goes transparent, so the gap
+  (and the space around the panels) is truly empty — the desktop shows through —
+  rather than a translucent slab; only the two panels carry a background. It works
+  over *any* layout (full, compact or a custom one). Toggle it live from the tray
+  under **Settings ▸ Split keyboard**, or with `handheld-kbd-ctl set split true` —
+  no relogin.
 
 ### Changed
 
