@@ -302,9 +302,10 @@ button.suggest:active {{ background: {t['key_active']}; }}
 button.suggest-empty {{ background: transparent; border-color: transparent; }}
 window.gm {{ background-color: rgba(0,0,0,0); }}
 .gm-keys {{ background-color: rgba(12,12,12,0.82); }}
-/* Split mode: transparent window, each panel its own rounded slab. */
+/* Split mode: fully transparent — only the key tiles paint. No panel slab behind
+   the keys, so the space between keys and beside the shorter rows is empty too. */
 window.splitwin {{ background-color: rgba(0,0,0,0); }}
-.kbpanel {{ background-color: {t['window_bg']}; border-radius: 12px; }}
+.kbpanel {{ background-color: transparent; }}
 /* Free movement is self-evident once the bar is there — a lit-up blue block on top of
    that is noise. Muted bar, muted grips, and the key gets an outline rather than a fill. */
 .handle-drag {{ background: {t.get('handle_bg', '#1e2733')}; }}
