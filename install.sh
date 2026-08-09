@@ -135,6 +135,11 @@ def save(p, data):
         f.write("\n")
     os.replace(tmp, p)
 
+def strip_blanks(rows):
+    # A layout with the shipped one's spacer cells removed. Used to tell whether a user's
+    # layout is just an un-aligned copy of ours (same keys, missing only the blank spacers).
+    return [[k for k in row if k.get("kind") != "blank"] for row in rows]
+
 for name in sorted(os.listdir(os.path.join(SRC, "layouts"))):
     if not name.endswith(".json"):
         continue
@@ -146,6 +151,17 @@ for name in sorted(os.listdir(os.path.join(SRC, "layouts"))):
     except Exception as ex:
         print(f"handheld-kbd: skipping {name} ({ex})", file=sys.stderr)
         continue
+    notes = []
+    # Spacer/alignment upgrade: if the user's layout is exactly this shipped layout with
+    # the blank spacer cells taken out, it's an un-aligned copy from before we added them
+    # (e.g. the arrow inverted-T). Adopt the shipped rows so the alignment reaches upgrades
+    # too — layouts are never clobbered otherwise. Skipped the moment they've customised
+    # anything (the rows stop matching) or already have the spacers (idempotent).
+    if (shipped.get("rows") != mine.get("rows")
+            and strip_blanks(shipped.get("rows", [])) == mine.get("rows", [])):
+        mine["rows"] = shipped["rows"]
+        notes.append("aligned spacers")
+
     have = {k.get("kind") for row in mine.get("rows", []) for k in row}
     have_keys = {k.get("key") for row in mine.get("rows", []) for k in row}
     added = []
@@ -163,9 +179,11 @@ for name in sorted(os.listdir(os.path.join(SRC, "layouts"))):
             have_keys.add(kname)
             added.append(key.get("label") or kind or kname)
     if added:
+        notes.append("added " + " ".join(added))
+    if notes:
         shutil.copy(dp, dp + ".bak")
         save(dp, mine)
-        print(f"handheld-kbd: added {' '.join(added)} to {name}")
+        print(f"handheld-kbd: {name}: {'; '.join(notes)}")
 
 cfg = os.path.join(DST, "config.json")
 try:
