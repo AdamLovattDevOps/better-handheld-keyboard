@@ -9,6 +9,16 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.0.18 — Upgrades pick up the aligned arrows
+
+### Fixed
+
+- **Upgrading now aligns the arrows on a layout you already have.** v1.0.17 fixed
+  the arrow inverted-T, but since `install.sh` never overwrites an existing layout,
+  the fix only reached fresh installs. The upgrade step now recognises a layout
+  that is an un-spaced copy of the shipped one and brings the spacer cells in, so an
+  upgrade gets the aligned arrows too. Layouts you've customised are left untouched.
+
 ## v1.0.17 — Aligned arrows, see-through keyboard
 
 ### Fixed
