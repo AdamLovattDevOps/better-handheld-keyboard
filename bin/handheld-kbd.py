@@ -272,7 +272,7 @@ def resolve_rows(layout):
         row = []
         for k in jrow:
             kind = k.get("kind", "")
-            if kind in ("locale", "hide", "size", "opacity", "move", "reset"):
+            if kind in ("locale", "hide", "size", "opacity", "move", "reset", "blank"):
                 dflt = {"locale": "🌐", "hide": "⌵", "size": "⤢",
                         "opacity": "◐", "move": "✥", "reset": "⤓"}.get(kind, "")
                 row.append((k.get("label", dflt), None, kind, "", ""))
@@ -306,9 +306,9 @@ button.suggest:active {{ background: {t['key_active']}; }}
 button.suggest-empty {{ background: transparent; border-color: transparent; }}
 window.gm {{ background-color: rgba(0,0,0,0); }}
 .gm-keys {{ background-color: rgba(12,12,12,0.82); }}
-/* Split mode: fully transparent — only the key tiles paint. No panel slab behind
-   the keys, so the space between keys and beside the shorter rows is empty too. */
-window.splitwin {{ background-color: rgba(0,0,0,0); }}
+/* Desktop mode (split or not): fully transparent — only the key tiles paint, so the
+   space between and around the keys shows the desktop through, never a grey slab. */
+window.clearwin {{ background-color: rgba(0,0,0,0); }}
 .kbpanel {{ background-color: transparent; }}
 /* Free movement is self-evident once the bar is there — a lit-up blue block on top of
    that is noise. Muted bar, muted grips, and the key gets an outline rather than a fill. */
@@ -355,7 +355,7 @@ class OSK(Gtk.Window):
         # Uniform aligned grid: every key snaps to a column grid (column_homogeneous),
         # widths come from per-kind unit spans, rows centred → tidy, even alignment.
         kh = config["key_size"][1]
-        SPAN = {'': 2, 'wide': 3, 'mod': 3, 'space': 8, 'locale': 2, 'hide': 2, 'reset': 2, 'size': 2, 'opacity': 2}
+        SPAN = {'': 2, 'wide': 3, 'mod': 3, 'space': 8, 'locale': 2, 'hide': 2, 'reset': 2, 'size': 2, 'opacity': 2, 'blank': 2}
         row_units = [sum(SPAN.get(k[2], 2) for k in row) for row in rows]
         maxu = max(row_units) if row_units else 1
         # Split mode: two independent keyboard panels pushed to the left and right
@@ -406,6 +406,12 @@ class OSK(Gtk.Window):
         def attach_key(grid, ri, col, key):
             (label, kc, kind, shifted, name) = key
             sp = SPAN.get(kind, 2)
+            if kind == 'blank':
+                # An empty placeholder cell — occupies grid space (so keys above/below it
+                # stay aligned, e.g. the arrow inverted-T) but paints and does nothing.
+                gap = Gtk.Box(); gap.set_can_focus(False)
+                grid.attach(gap, col, ri, sp, 1)
+                return
             b = Gtk.Button(label=label)
             # A label must never dictate the window's size. The grid is column-homogeneous,
             # so ONE wide label widens every column — the 🌐 key reading "🌐LATAM" pushed the
@@ -487,15 +493,16 @@ class OSK(Gtk.Window):
         self.handle = self._build_handle()
         self.handle.set_no_show_all(True)
         self.orig_touch_mode = None
-        # Split mode paints nothing behind the keys — the window is transparent and only
-        # the two panels carry a background, so the middle gap and the space around the
-        # panels are truly empty (the desktop shows through), not a translucent slab.
-        if self.split and not GAMEMODE:
+        # Desktop mode paints nothing behind the keys — the window is transparent and only
+        # the key tiles carry a background, so the space between and around the keys is
+        # truly empty (the desktop shows through), not a translucent slab. Same in split
+        # (the middle gap shows through too) and non-split (just as space-efficient).
+        if not GAMEMODE:
             vis = self.get_screen().get_rgba_visual()
             if vis is not None:
                 self.set_visual(vis)
             self.set_app_paintable(True)
-            self.get_style_context().add_class("splitwin")
+            self.get_style_context().add_class("clearwin")
         if GAMEMODE:
             # Transparent fullscreen overlay: gamescope fullscreens us, the game shows
             # through the transparent top, keys docked at the bottom on a dark strip.
