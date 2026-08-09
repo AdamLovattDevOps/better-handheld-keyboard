@@ -9,6 +9,35 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.0.16 — Split keyboard
+
+A split-keyboard mode for thumb-typing while you grip the device: the keyboard
+breaks into two distinct halves at the left and right edges with a clean, empty
+channel down the middle. The tray's Settings menu is also reorganised into
+labelled groups.
+
+### Added
+
+- **Split keyboard.** Set `split: true` and the keyboard breaks into two compact
+  key clusters pushed to the left and right screen edges, with a wide empty gap
+  down the middle for thumb-typing while you grip the device. The window goes fully
+  transparent — only the key tiles paint — so the gap, the space between keys and
+  the space around the clusters all show the desktop through, rather than a grey
+  slab. It works over *any* layout (full, compact or a custom one). Two knobs size
+  it: `split_key_w` (key width in px, default `52` — smaller keys give a bigger
+  gap) and `split_gap` (the minimum middle width in px, default `140`). Toggle it
+  live from the tray under **Settings ▸ Split keyboard**, or with `handheld-kbd-ctl
+  set split true` — no relogin.
+
+### Changed
+
+- **The tray Settings menu is grouped.** Instead of one flat list of toggles and
+  pick-lists, the settings now sit under captioned headings — **Typing**
+  (prediction, learn words, suggestions, glide typing), **Layout & appearance**
+  (layout, super-key icon, split, big mode, position) and **Summoning & input**
+  (mirror mode, swipe-up summon, gesture fingers) — divided by separators, so
+  related settings are together.
+
 ## v1.0.15 — Configure it all from the tray
 
 The system-tray menu grows a **Settings** submenu that exposes every configurable that

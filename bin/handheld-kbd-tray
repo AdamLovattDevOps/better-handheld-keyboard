@@ -38,7 +38,7 @@ LAYOUT_DIR = os.path.expanduser("~/.config/handheld-kbd/layouts")
 # file still shows the right state (the keyboard fills these in the same way).
 DEFAULTS = {
     "prediction": True, "predict_learn": True, "swipe": True,
-    "gesture_summon": False, "start_big": False, "mirror": True,
+    "gesture_summon": False, "start_big": False, "mirror": True, "split": False,
     "layout": "full", "position_mode": "bottom",
     "suggestion_count": 3, "gesture_fingers": 2, "super_icon": "windows",
 }
@@ -48,6 +48,7 @@ BOOL_SETTINGS = [
     ("prediction",     "Prediction"),
     ("predict_learn",  "Learn words"),
     ("swipe",          "Glide (swipe) typing"),
+    ("split",          "Split keyboard"),
     ("gesture_summon", "Swipe-up summon"),
     ("start_big",      "Start in big mode"),
     ("mirror",         "Mirror mode"),
@@ -74,6 +75,19 @@ SETTINGS_ID = 20
 SETTINGS_SEP = 30
 BOOL_BASE = 21
 CHOICE_BASE = 100          # menu i gets CHOICE_BASE*(i+1); its children sit just above
+
+# The Settings submenu is organised into labelled groups so related settings sit
+# together instead of in one long flat list. Each group is (title, [tokens]); a token
+# is a bool config key, or "@key" for a pick-list submenu. A greyed, unclickable header
+# names each group and a separator divides them. Keys must exist in BOOL_SETTINGS /
+# CHOICE_SETTINGS above — the group list only re-orders and captions them.
+SECTION_BASE = 40          # group i's header id is SECTION_BASE + i
+GROUP_SEP_BASE = 30        # the separator before group i (i>0) is GROUP_SEP_BASE + i
+SETTINGS_GROUPS = [
+    ("Typing",              ["prediction", "predict_learn", "@suggestion_count", "swipe"]),
+    ("Layout & appearance", ["@layout", "@super_icon", "split", "start_big", "@position_mode"]),
+    ("Summoning & input",   ["mirror", "gesture_summon", "@gesture_fingers"]),
+]
 
 
 def load_cfg():
@@ -214,8 +228,8 @@ class Tray:
         6: ("Fix trackpad pointer",  "input-touchpad",         lambda: run(f"{BIN}/handheld-kbd-fix-pointer")),
         8: ("Stop keyboard",         "process-stop",           lambda: run(f"{BIN}/handheld-kbd-ctl", "stop")),
     }
-    # Separators: 2 and 7 at the top level; 30 inside Settings (toggles | pick-lists).
-    SEPARATORS = (2, 7, SETTINGS_SEP)
+    # Separators: 2 and 7 at the top level; one between each pair of Settings groups.
+    SEPARATORS = (2, 7) + tuple(GROUP_SEP_BASE + i for i in range(1, len(SETTINGS_GROUPS)))
     # Top-level order. Settings takes the slot the super-icon submenu used to hold, in
     # the config cluster after Languages, rather than sorting to the bottom by id.
     ORDER = [1, 2, 3, 4, 5, SETTINGS_ID, 6, 7, 8]
@@ -243,6 +257,13 @@ class Tray:
                 self.choice_children[cid] = (menu_id, key, kind, value, clabel)
             self.choice_menus[menu_id] = (key, label, kind, kids)
 
+        # Group headers, and key -> id lookups so the group spec can name settings by
+        # their config key rather than repeating ids.
+        self.sections = {SECTION_BASE + gi: title
+                         for gi, (title, _toks) in enumerate(SETTINGS_GROUPS)}
+        self.bool_id = {key: bid for bid, (key, _l) in self.bools.items()}
+        self.choice_id = {v[0]: mid for mid, v in self.choice_menus.items()}
+
     # ---- menu model ----
 
     def label(self, item_id):
@@ -266,18 +287,28 @@ class Tray:
             return False
 
     def _settings_order(self):
-        # Toggles, a separator, then the pick-list submenus. Dict insertion order is the
-        # display order for each group.
-        return list(self.bools) + [SETTINGS_SEP] + list(self.choice_menus)
+        # Walk the group spec: a header, then its settings (bool ids or pick-list menu
+        # ids resolved by config key), with a separator before each later group.
+        order = []
+        for gi, (_title, toks) in enumerate(SETTINGS_GROUPS):
+            if gi:
+                order.append(GROUP_SEP_BASE + gi)
+            order.append(SECTION_BASE + gi)
+            for tok in toks:
+                order.append(self.choice_id[tok[1:]] if tok.startswith("@")
+                             else self.bool_id[tok])
+        return order
 
     def _all_ids(self):
         return (list(self.ACTIONS) + list(self.SEPARATORS) + [SETTINGS_ID]
-                + list(self.bools) + list(self.choice_menus) + list(self.choice_children))
+                + list(self.sections) + list(self.bools)
+                + list(self.choice_menus) + list(self.choice_children))
 
     def _known(self, item_id):
         return (item_id in self.ACTIONS or item_id in self.SEPARATORS
-                or item_id == SETTINGS_ID or item_id in self.bools
-                or item_id in self.choice_menus or item_id in self.choice_children)
+                or item_id == SETTINGS_ID or item_id in self.sections
+                or item_id in self.bools or item_id in self.choice_menus
+                or item_id in self.choice_children)
 
     def props(self, item_id):
         if item_id in self.SEPARATORS:
@@ -288,6 +319,13 @@ class Tray:
                 "icon-name": GLib.Variant("s", "configure"),
                 "children-display": GLib.Variant("s", "submenu"),
                 "enabled": GLib.Variant("b", True),
+                "visible": GLib.Variant("b", True),
+            }
+        if item_id in self.sections:
+            # A group caption: shown but disabled, so it reads as a heading, not a choice.
+            return {
+                "label": GLib.Variant("s", self.sections[item_id]),
+                "enabled": GLib.Variant("b", False),
                 "visible": GLib.Variant("b", True),
             }
         if item_id in self.bools:

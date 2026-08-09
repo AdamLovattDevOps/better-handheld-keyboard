@@ -68,6 +68,17 @@ DEFAULT_CONFIG = {
     # size, a drag bar appears, and you put it where you want. Pressing it again locks it
     # exactly there — it does not move the window — and saves the spot as `geometry`.
     "handle_height": 30,
+    # Split keyboard: two compact key clusters pushed to the left and right screen edges
+    # with a big empty (transparent) middle, so you can thumb-type while gripping the
+    # device. Works over ANY layout — each row is cut at its own midpoint. Toggle live
+    # from the tray ("Split keyboard") or `handheld-kbd-ctl set split true`.
+    #   split_key_w — width of a normal split key in PIXELS. Smaller keys = smaller
+    #                 clusters = a bigger middle gap (the middle takes whatever's left).
+    #   split_gap   — the MINIMUM middle-channel width in pixels (a floor; the actual
+    #                 gap is usually larger, being whatever the clusters don't use).
+    "split": False,
+    "split_key_w": 52,
+    "split_gap": 140,
     # "mirror": true  → the device's keyboard button summons us (via Steam's OSK).
     # "mirror": false → seamless mode: the daemon remaps the hardware keyboard button
     #                   (via InputPlumber) to fire dbus_trigger, which we listen for
@@ -295,6 +306,10 @@ button.suggest:active {{ background: {t['key_active']}; }}
 button.suggest-empty {{ background: transparent; border-color: transparent; }}
 window.gm {{ background-color: rgba(0,0,0,0); }}
 .gm-keys {{ background-color: rgba(12,12,12,0.82); }}
+/* Split mode: fully transparent — only the key tiles paint. No panel slab behind
+   the keys, so the space between keys and beside the shorter rows is empty too. */
+window.splitwin {{ background-color: rgba(0,0,0,0); }}
+.kbpanel {{ background-color: transparent; }}
 /* Free movement is self-evident once the bar is there — a lit-up blue block on top of
    that is noise. Muted bar, muted grips, and the key gets an outline rather than a fill. */
 .handle-drag {{ background: {t.get('handle_bg', '#1e2733')}; }}
@@ -343,68 +358,144 @@ class OSK(Gtk.Window):
         SPAN = {'': 2, 'wide': 3, 'mod': 3, 'space': 8, 'locale': 2, 'hide': 2, 'reset': 2, 'size': 2, 'opacity': 2}
         row_units = [sum(SPAN.get(k[2], 2) for k in row) for row in rows]
         maxu = max(row_units) if row_units else 1
-        grid = Gtk.Grid()
-        self.grid = grid
-        grid.set_column_homogeneous(True)
-        grid.set_halign(Gtk.Align.CENTER)
-        grid.set_margin_top(4); grid.set_margin_bottom(4)
-        for ri, row in enumerate(rows):
-            col = (maxu - row_units[ri]) // 2          # centre each row on the unit grid
-            for (label, kc, kind, shifted, name) in row:
-                sp = SPAN.get(kind, 2)
-                b = Gtk.Button(label=label)
-                # A label must never dictate the window's size. The grid is
-                # column-homogeneous, so ONE wide label widens every column — the 🌐 key
-                # reading "🌐LATAM" pushed the whole keyboard to 1728px on a 1280px
-                # desktop, and since GTK refuses to shrink a window below its natural
-                # width, ⤓ could no longer bring it back either. Ellipsizing makes the
-                # natural width tiny; the homogeneous grid still gives every key its
-                # even share of whatever width the dock grants.
-                ch = b.get_child()
-                if isinstance(ch, Gtk.Label):
-                    ch.set_ellipsize(Pango.EllipsizeMode.END)
-                b.set_can_focus(False)
-                b.set_hexpand(True); b.set_vexpand(False)
-                b.set_size_request(-1, kh)
-                if kind == 'locale':
-                    b.get_style_context().add_class('special')
-                    b.connect("clicked", self.on_locale)
-                    self.locale_btn = b
-                elif kind == 'size':
-                    b.get_style_context().add_class('special')
-                    b.connect("clicked", self.on_size)
-                    self.size_btn = b
-                elif kind == 'opacity':
-                    b.get_style_context().add_class('special')
-                    b.connect("clicked", self.on_opacity)
-                    self.opacity_btn = b
-                    b.set_label(f"{int(round(float(config.get('opacity', 0.72)) * 100))}%")
-                elif kind == 'move':
-                    b.get_style_context().add_class('special')
-                    b.connect("clicked", self.on_move)
-                    self.move_btn = b
-                elif kind == 'reset':
-                    b.get_style_context().add_class('special')
-                    b.connect("clicked", self.on_reset)
-                elif kind == 'hide':
-                    b.get_style_context().add_class('hide')
-                    b.connect("clicked", lambda *_: self.dismiss())
-                elif kind == 'mod':
-                    b.get_style_context().add_class('special')
-                    b.connect("clicked", self.on_mod, kc)
-                    self.modbtns.append((b, kc))
+        # Split mode: two independent keyboard panels pushed to the left and right
+        # screen edges with a wide, empty (transparent) gap between them. Each panel is
+        # its own grid with its own local columns; the panels sit at natural size so an
+        # expanding spacer in the middle can take all the slack (see the assembly below).
+        self.split = bool(config.get("split", False))
+        placements = []                       # non-split: one centred grid
+        left_placements, right_placements = [], []
+        leftmax = rightmax = 1
+        if self.split:
+            # Cut each row at its unit-midpoint. Left-panel keys are flush to the panel's
+            # left, right-panel keys flush to the panel's right, so each panel is a solid
+            # block that hugs its screen edge.
+            splits = []                       # (left_keys, right_keys, left_units, right_units)
+            for row in rows:
+                if len(row) > 1:
+                    tot, acc, idx = sum(SPAN.get(k[2], 2) for k in row), 0, len(row)
+                    for j, k in enumerate(row):
+                        acc += SPAN.get(k[2], 2)
+                        if acc >= tot / 2.0:
+                            idx = max(1, j + 1); break
+                    left, right = row[:idx], row[idx:]
                 else:
-                    b.connect("clicked", self.on_key, kc)
-                    self.keybtns.append((b, name, label, shifted))
-                if name == "KEY_LEFTMETA":
-                    apply_super_icon(config, b, kh)
-                grid.attach(b, col, ri, sp, 1)
-                col += sp
+                    left, right = row, []
+                splits.append((left, right,
+                               sum(SPAN.get(k[2], 2) for k in left),
+                               sum(SPAN.get(k[2], 2) for k in right)))
+            leftmax = max((s[2] for s in splits), default=1)
+            rightmax = max((s[3] for s in splits), default=1)
+            for ri, (left, right, lu, ru) in enumerate(splits):
+                col = 0
+                for k in left:
+                    left_placements.append((ri, col, k)); col += SPAN.get(k[2], 2)
+                col = rightmax - ru           # right-align within the right panel
+                for k in right:
+                    right_placements.append((ri, col, k)); col += SPAN.get(k[2], 2)
+        else:
+            for ri, row in enumerate(rows):
+                col = (maxu - row_units[ri]) // 2   # centre each row on the unit grid
+                for k in row:
+                    placements.append((ri, col, k)); col += SPAN.get(k[2], 2)
+        # Split geometry: a fixed (smaller) key width so the clusters stay compact, and a
+        # minimum middle channel. The middle then takes whatever the clusters leave.
+        split_unit_w = max(1, int(config.get("split_key_w", 52)) // 2)
+        self._split_channel = max(0, int(config.get("split_gap", 140))) if self.split else 0
+
+        def attach_key(grid, ri, col, key):
+            (label, kc, kind, shifted, name) = key
+            sp = SPAN.get(kind, 2)
+            b = Gtk.Button(label=label)
+            # A label must never dictate the window's size. The grid is column-homogeneous,
+            # so ONE wide label widens every column — the 🌐 key reading "🌐LATAM" pushed the
+            # whole keyboard to 1728px on a 1280px desktop. Ellipsizing keeps the natural
+            # width tiny; the grid still gives every key its even share of the width.
+            ch = b.get_child()
+            if isinstance(ch, Gtk.Label):
+                ch.set_ellipsize(Pango.EllipsizeMode.END)
+            b.set_can_focus(False)
+            b.set_vexpand(False)
+            if self.split:
+                b.set_hexpand(False); b.set_size_request(sp * split_unit_w, kh)
+            else:
+                b.set_hexpand(True); b.set_size_request(-1, kh)
+            if kind == 'locale':
+                b.get_style_context().add_class('special')
+                b.connect("clicked", self.on_locale); self.locale_btn = b
+            elif kind == 'size':
+                b.get_style_context().add_class('special')
+                b.connect("clicked", self.on_size); self.size_btn = b
+            elif kind == 'opacity':
+                b.get_style_context().add_class('special')
+                b.connect("clicked", self.on_opacity); self.opacity_btn = b
+                b.set_label(f"{int(round(float(config.get('opacity', 0.72)) * 100))}%")
+            elif kind == 'move':
+                b.get_style_context().add_class('special')
+                b.connect("clicked", self.on_move); self.move_btn = b
+            elif kind == 'reset':
+                b.get_style_context().add_class('special')
+                b.connect("clicked", self.on_reset)
+            elif kind == 'hide':
+                b.get_style_context().add_class('hide')
+                b.connect("clicked", lambda *_: self.dismiss())
+            elif kind == 'mod':
+                b.get_style_context().add_class('special')
+                b.connect("clicked", self.on_mod, kc); self.modbtns.append((b, kc))
+            else:
+                b.connect("clicked", self.on_key, kc)
+                self.keybtns.append((b, name, label, shifted))
+            if name == "KEY_LEFTMETA":
+                apply_super_icon(config, b, kh)
+            grid.attach(b, col, ri, sp, 1)
+
+        def new_grid():
+            g = Gtk.Grid()
+            g.set_column_homogeneous(True)
+            g.set_margin_top(4); g.set_margin_bottom(4)
+            return g
+
+        if self.split:
+            # Two compact clusters at the screen edges; the expanding middle takes all the
+            # space the smaller keys free up (with a minimum-width floor). The keys are a
+            # fixed size, so the clusters stay small and the gap grows.
+            lgrid, rgrid = new_grid(), new_grid()
+            lgrid.set_halign(Gtk.Align.START); rgrid.set_halign(Gtk.Align.END)
+            for g in (lgrid, rgrid):
+                g.set_valign(Gtk.Align.CENTER)
+            for (ri, col, key) in left_placements:
+                attach_key(lgrid, ri, col, key)
+            for (ri, col, key) in right_placements:
+                attach_key(rgrid, ri, col, key)
+            keys_root = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+            mid = Gtk.Box(); mid.set_can_focus(False); mid.set_hexpand(True)   # empty middle
+            mid.set_size_request(self._split_channel, -1)     # a floor, not a fixed width
+            keys_root.pack_start(lgrid, False, False, 0)
+            keys_root.pack_start(mid, True, True, 0)
+            keys_root.pack_end(rgrid, False, False, 0)
+            self._grids = [lgrid, rgrid]
+        else:
+            grid = new_grid()
+            grid.set_halign(Gtk.Align.CENTER)
+            for (ri, col, key) in placements:
+                attach_key(grid, ri, col, key)
+            keys_root = grid
+            self._grids = [grid]
+        self.grid = keys_root
         self._init_prediction(rows)
         # Drag/resize bar, hidden until the move key unlocks the keyboard.
         self.handle = self._build_handle()
         self.handle.set_no_show_all(True)
         self.orig_touch_mode = None
+        # Split mode paints nothing behind the keys — the window is transparent and only
+        # the two panels carry a background, so the middle gap and the space around the
+        # panels are truly empty (the desktop shows through), not a translucent slab.
+        if self.split and not GAMEMODE:
+            vis = self.get_screen().get_rgba_visual()
+            if vis is not None:
+                self.set_visual(vis)
+            self.set_app_paintable(True)
+            self.get_style_context().add_class("splitwin")
         if GAMEMODE:
             # Transparent fullscreen overlay: gamescope fullscreens us, the game shows
             # through the transparent top, keys docked at the bottom on a dark strip.
@@ -413,14 +504,15 @@ class OSK(Gtk.Window):
                 self.set_visual(vis)
             self.set_app_paintable(True)
             self.get_style_context().add_class("gm")
-            grid.get_style_context().add_class("gm-keys")
+            for g in self._grids:
+                g.get_style_context().add_class("gm-keys")
             outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
             spacer = Gtk.Box(); spacer.set_vexpand(True)   # transparent filler
             outer.pack_start(spacer, True, True, 0)
             if self.sugbar is not None:
                 self.sugbar.get_style_context().add_class("gm-keys")
                 outer.pack_start(self.sugbar, False, False, 0)
-            outer.pack_end(grid, False, False, 0)
+            outer.pack_end(keys_root, False, False, 0)
             self.add(outer)
         else:
             # handle bar (hidden while locked) → suggestions → keys
@@ -428,7 +520,7 @@ class OSK(Gtk.Window):
             box.pack_start(self.handle, False, False, 0)
             if self.sugbar is not None:
                 box.pack_start(self.sugbar, False, False, 0)
-            box.pack_start(grid, True, True, 0)
+            box.pack_start(keys_root, True, True, 0)
             self.add(box)
         self.set_wmclass("handheld-kbd", "handheld-kbd")
         self.set_title("handheld-kbd")
@@ -503,9 +595,8 @@ class OSK(Gtk.Window):
             return
 
         n = max(1, int(self.cfg.get("suggestion_count", 3)))
-        bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0, homogeneous=True)
-        bar.set_size_request(-1, int(self.cfg.get("suggest_height", 44)))
-        for i in range(n):
+
+        def make_sugbtn(i):
             b = Gtk.Button(label="")
             # Same rule as the keys: a long suggested word must not widen the window.
             ch = b.get_child()
@@ -516,8 +607,31 @@ class OSK(Gtk.Window):
             b.get_style_context().add_class("suggest")
             b.get_style_context().add_class("suggest-empty")
             b.connect("clicked", self._on_suggestion, i)
-            bar.pack_start(b, True, True, 0)
             self.sugbtns.append(b)
+            return b
+
+        h = int(self.cfg.get("suggest_height", 44))
+        if self.split:
+            # Mirror the keyboard: suggestions over the two panels, the same empty channel
+            # between them — so the middle stays clear top to bottom, not bridged by a bar.
+            left = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0, homogeneous=True)
+            right = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0, homogeneous=True)
+            split_at = (n + 1) // 2
+            for i in range(n):
+                (left if i < split_at else right).pack_start(make_sugbtn(i), True, True, 0)
+            bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+            mid = Gtk.Box(); mid.set_can_focus(False)
+            mid.set_size_request(getattr(self, "_split_channel", 0), -1)
+            for w in (left, right):
+                w.set_hexpand(True)
+            bar.pack_start(left, True, True, 0)
+            bar.pack_start(mid, False, False, 0)
+            bar.pack_end(right, True, True, 0)
+        else:
+            bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0, homogeneous=True)
+            for i in range(n):
+                bar.pack_start(make_sugbtn(i), True, True, 0)
+        bar.set_size_request(-1, h)
         self.sugbar = bar
 
     def _emit(self, kc, shift=False, settle=None):
@@ -937,9 +1051,12 @@ class OSK(Gtk.Window):
         stretches to fill the whole window (both axes) so no screen space is wasted."""
         big = self.big
         # Grid fill behaviour: big → keys expand to fill; normal → tidy centred cluster.
-        self.grid.set_halign(Gtk.Align.FILL if big else Gtk.Align.CENTER)
-        self.grid.set_valign(Gtk.Align.FILL)
-        self.grid.set_row_homogeneous(big)
+        # Split panels keep their START/END alignment and fixed key widths (the HBox
+        # spacer, not the grid, owns the middle), so only touch the single non-split grid.
+        if not self.split:
+            self.grid.set_halign(Gtk.Align.FILL if big else Gtk.Align.CENTER)
+            self.grid.set_valign(Gtk.Align.FILL)
+            self.grid.set_row_homogeneous(big)
         # In Desktop big mode the resized window + row_homogeneous drive key height, so
         # keep the size_request floor at the normal height (a taller floor would exceed
         # the per-row allocation and distort the grid). Game Mode has no window resize,
@@ -965,10 +1082,14 @@ class OSK(Gtk.Window):
             handle = (int(self.cfg.get("handle_height", 30)) + 4) if self.unlocked else 0
             fit = (rect["h"] - bar - handle - 8) // self.nrows   # 8 = grid margins
             kh = max(24, min(kh, fit))
-        for child in self.grid.get_children():
-            child.set_vexpand(big)
-            child.set_valign(Gtk.Align.FILL)
-            child.set_size_request(-1, kh)
+        for g in self._grids:
+            for child in g.get_children():
+                child.set_vexpand(big)
+                child.set_valign(Gtk.Align.FILL)
+                # Split keys keep their fixed width (that's what keeps clusters compact);
+                # only the height tracks the fit. Non-split keys stretch (width -1).
+                cw = child.get_size_request().width if self.split else -1
+                child.set_size_request(cw, kh)
         if self.size_btn:
             self._set_label(self.size_btn, "⤡" if big else "⤢", "")
         # Window geometry. Game Mode is a fullscreen gamescope overlay (keys docked at
