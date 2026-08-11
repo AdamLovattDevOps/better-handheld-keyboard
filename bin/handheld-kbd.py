@@ -158,12 +158,12 @@ THEMES = {
         "shift_live_bg": "#26426e",
     },
     "light": {
-        "window_bg": "#eceff4", "key_bg": "#ffffff", "key_fg": "#1b1f26",
-        "key_border": "#c3cbd6", "key_active": "#3daee9",
-        "mod_on_bg": "#ff8c00", "mod_on_fg": "#1b1f26", "mod_on_border": "#c86400",
-        "special_bg": "#dfe4ec", "special_fg": "#3b4252", "shifted_fg": "#2a6fb0",
-        "shift_live_bg": "#3daee9", "suggest_bg": "#dfe4ec", "suggest_fg": "#1b1f26",
-        "handle_bg": "#d3d9e2", "handle_fg": "#3b4252",
+        "window_bg": "#eceff4", "key_bg": "#ffffff", "key_fg": "#000000",
+        "key_border": "#b3bcc9", "key_active": "#3daee9",
+        "mod_on_bg": "#ff8c00", "mod_on_fg": "#000000", "mod_on_border": "#c86400",
+        "special_bg": "#dbe1ea", "special_fg": "#000000", "shifted_fg": "#12508c",
+        "shift_live_bg": "#3daee9", "suggest_bg": "#dbe1ea", "suggest_fg": "#000000",
+        "handle_bg": "#d3d9e2", "handle_fg": "#000000",
     },
     "contrast": {
         "window_bg": "#000000", "key_bg": "#111111", "key_fg": "#ffffff",
@@ -258,7 +258,17 @@ def apply_super_icon(config, button, kh):
         return
     try:
         size = max(20, int(kh * 0.55))
-        pix = GdkPixbuf.Pixbuf.new_from_file_at_size(path, size, size)
+        # The logos ship as white monochrome (fill="#f5f5f5"); tint them to the theme's
+        # text colour so they stay visible on light themes (white-on-white otherwise).
+        fg = (config.get("theme") or {}).get("key_fg", "#f5f5f5")
+        svg = open(path, "r", encoding="utf-8").read()
+        for c in ("#f5f5f5", "#F5F5F5", "#ffffff", "#FFFFFF", "#fff", "#FFF"):
+            svg = svg.replace(c, fg)
+        loader = GdkPixbuf.PixbufLoader.new_with_type("svg")
+        loader.set_size(size, size)
+        loader.write(svg.encode("utf-8"))
+        loader.close()
+        pix = loader.get_pixbuf()
         img = Gtk.Image.new_from_pixbuf(pix)
         button.set_image(img)
         button.set_always_show_image(True)
@@ -394,6 +404,14 @@ button.suggest {{ background: {t.get('suggest_bg', '#242424')}; color: {t.get('s
                  font-size: 20px; border: 1px solid {t.get('suggest_border', t['key_border'])}; }}
 button.suggest:active {{ background: {t.get('suggest_active', t['key_active'])}; }}
 button.suggest-empty {{ background: transparent; border-color: transparent; }}
+/* Breeze (and some GTK themes) colour the button's <label> child directly, which
+   out-cascades `button {{ color }}` and leaves the text stuck at the theme's grey.
+   Target the label element too so the chosen theme's foreground always wins. */
+button label {{ color: {t['key_fg']}; }}
+button.special label {{ color: {t['special_fg']}; }}
+button.mod-on label {{ color: {t['mod_on_fg']}; }}
+button.hide label {{ color: #ffd9d9; }}
+button.suggest label {{ color: {t.get('suggest_fg', '#e8e8e8')}; }}
 window.gm {{ background-color: rgba(0,0,0,0); }}
 .gm-keys {{ background-color: rgba(12,12,12,0.82); }}
 /* Desktop mode (split or not): fully transparent — only the key tiles paint, so the
