@@ -33,6 +33,11 @@ The heading must be `## v<version> — <title>` and the version must match the t
   the same-size keyboard higher up the screen, and grow in both width and height so they
   stay in proportion. The sizes are kept within the panel so 3× and 4× don't clip off
   the edges.
+- Theme text is now legible on any GTK desktop theme — the label colour is forced so a
+  chosen theme's foreground wins over Breeze (which was pinning labels grey, worst on the
+  Light theme).
+- The super-key logo tints to the theme's text colour, so it stays visible on the light
+  themes instead of being white-on-white.
 
 ## v1.0.18 — Upgrades pick up the aligned arrows
 
