@@ -9,21 +9,28 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
-## v1.0.19 — Live shift preview, colour themes, bigger size
+## v1.0.19 — Live shift preview, colour themes, 1×–4× sizes
 
 ### Added
 
 - **Holding Shift shows what you'll actually type.** While a Shift key is down every
-  key now displays its capital or symbol form as its main label — no tiny superscript
-  to squint at — and the keys that have an alternate light up, so you can see at a
-  glance exactly which keys change and to what.
-- **Six colour themes.** Pick from **Midnight**, **Light**, **High contrast**,
-  **Nord**, **Solarized** and **Rose** via the tray **Settings ▸ Colour theme**, or
-  `handheld-kbd-ctl set color_theme <name>`. Any `theme` values you've hand-edited in
-  `config.json` still win over the preset.
-- **A third, bigger keyboard size.** The size key now cycles **Normal → Big → Bigger**
-  instead of just toggling two sizes, so you can go taller still on a large panel.
-  Also selectable from the tray **Settings ▸ Keyboard size**.
+  key displays its capital or symbol form as its main label — no tiny superscript to
+  squint at. It swaps the glyph only (no colour change). Toggle it from the tray
+  **Settings ▸ Shift preview**.
+- **Six colour themes for the whole keyboard.** Pick **Midnight**, **Light**,
+  **High contrast**, **Nord**, **Solarized** or **Rose** from the tray **Settings ▸
+  Colour theme** (or `handheld-kbd-ctl set color_theme <name>`). The chosen theme
+  recolours the keys, window and the predictive-text bar together.
+- **Four keyboard sizes, 1×–4×.** The size key now cycles four clearly-labelled steps
+  **1× → 2× → 3× → 4×** (was a two-way toggle with an arrow glyph), each a genuinely
+  larger keyboard. Also selectable from the tray **Settings ▸ Keyboard size**.
+
+### Fixed
+
+- The colour theme now reaches the **keys** even when an older `config.json` carries a
+  full default `theme` block (which previously pinned the keys grey).
+- In **split** mode the size steps now actually resize the keys instead of just docking
+  the same-size keyboard higher up the screen.
 
 ## v1.0.18 — Upgrades pick up the aligned arrows
 

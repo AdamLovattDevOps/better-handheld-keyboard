@@ -66,9 +66,12 @@ DEFAULT_CONFIG = {
     # Steam's own OSK. "custom" uses `geometry`, which is what the lock key writes after
     # you drag the keyboard somewhere. The reset key (kind "reset") goes back to "bottom".
     "position_mode": "bottom",
-    "dock_height_frac": 0.42,
-    "big_height_frac": 0.55,
-    "huge_height_frac": 0.68,      # the third ("Bigger") size level
+    # Keyboard-size cycle (the size key): four steps, 1x-4x, each a larger fraction of
+    # the panel height. The size key is labelled 1x/2x/3x/4x (no arrow glyphs).
+    "dock_height_frac": 0.42,      # 1x
+    "big_height_frac": 0.55,       # 2x
+    "huge_height_frac": 0.68,      # 3x
+    "mega_height_frac": 0.82,      # 4x
     # The move key (kind "move") unlocks the keyboard: KWin stops forcing its position and
     # size, a drag bar appears, and you put it where you want. Pressing it again locks it
     # exactly there — it does not move the window — and saves the spot as `geometry`.
@@ -128,6 +131,9 @@ DEFAULT_CONFIG = {
     # so a hand-edited theme value always wins over the preset. Change it live from the
     # tray ("Colour theme") or: handheld-kbd-ctl set color_theme <name>.
     "color_theme": "midnight",
+    # While Shift is held, repaint each key to the shifted/capital glyph it will type and
+    # highlight the keys that have an alternate. Toggle from the tray ("Shift preview").
+    "shift_preview": True,
     "theme": {
         "window_bg": "#161616", "key_bg": "#333333", "key_fg": "#f5f5f5",
         "key_border": "#0d0d0d", "key_active": "#3daee9",
@@ -211,14 +217,17 @@ def _deep_merge(base, over):
 
 
 def _apply_theme_preset(merged, raw_theme):
-    """Layer the named colour preset under any explicit user theme keys.
-
-    Precedence (lowest → highest): DEFAULT_CONFIG theme < named preset < user's own
-    `theme` keys. An unknown preset name contributes nothing, so it falls back to just
-    default+user; "midnight" reproduces the original look exactly."""
+    """A named colour theme recolours the WHOLE keyboard. The preset intentionally wins
+    over any `theme` block in config — older configs shipped a full default theme that
+    would otherwise pin the keys grey no matter which theme you picked (the bug: "the main
+    keyboard is still grey"). Pick 'midnight' for the original look. The predictive-text
+    bar inherits the theme's key colours, with the accent as its border."""
     preset = THEMES.get(merged.get("color_theme", "midnight"), {})
-    merged["theme"] = _deep_merge(_deep_merge(DEFAULT_CONFIG["theme"], preset),
-                                  raw_theme or {})
+    theme = _deep_merge(_deep_merge(DEFAULT_CONFIG["theme"], raw_theme or {}), preset)
+    for dst, src in (("suggest_bg", "key_bg"), ("suggest_fg", "key_fg"),
+                     ("suggest_active", "key_active"), ("suggest_border", "key_active")):
+        theme.setdefault(dst, theme.get(src))
+    merged["theme"] = theme
     return merged
 
 
@@ -380,8 +389,8 @@ button.special {{ background: {t['special_bg']}; color: {t['special_fg']}; }}
 button.hide {{ background: #5a1f1f; color: #ffd9d9; }}
 button.hide:active {{ background: #c0392b; }}
 button.suggest {{ background: {t.get('suggest_bg', '#242424')}; color: {t.get('suggest_fg', '#e8e8e8')};
-                 font-size: 20px; border: 1px solid {t['key_border']}; }}
-button.suggest:active {{ background: {t['key_active']}; }}
+                 font-size: 20px; border: 1px solid {t.get('suggest_border', t['key_border'])}; }}
+button.suggest:active {{ background: {t.get('suggest_active', t['key_active'])}; }}
 button.suggest-empty {{ background: transparent; border-color: transparent; }}
 window.gm {{ background-color: rgba(0,0,0,0); }}
 .gm-keys {{ background-color: rgba(12,12,12,0.82); }}
@@ -425,11 +434,13 @@ class OSK(Gtk.Window):
         # derived boolean mirror the KWin-script and swap daemon still read. Seed from
         # size_level, or from legacy start_big if only that is set.
         self.size_level = int(config.get("size_level", 1 if config.get("start_big") else 0))
-        self.size_level = max(0, min(2, self.size_level))
+        self.size_level = max(0, min(3, self.size_level))
         self.big = self.size_level >= 1
         # Reconcile a stale start_big mirror (e.g. hand-edited config where the two disagree).
         if bool(config.get("start_big")) != (self.size_level >= 1):
             self._persist("start_big", self.size_level >= 1)
+        # Live Shift preview: repaint keys to their shifted glyph while Shift is held.
+        self.shift_preview = bool(config.get("shift_preview", True))
         # Unlocked = KWin's rule is on Remember, so the user can drag/resize by hand.
         # Always starts locked; an unlocked keyboard that got respawned would drift.
         self.unlocked = False
@@ -510,7 +521,8 @@ class OSK(Gtk.Window):
             b.set_can_focus(False)
             b.set_vexpand(False)
             if self.split:
-                b.set_hexpand(False); b.set_size_request(sp * split_unit_w, kh)
+                b.set_hexpand(False); b._base_w = sp * split_unit_w
+                b.set_size_request(b._base_w, kh)
             else:
                 b.set_hexpand(True); b.set_size_request(-1, kh)
             if kind == 'locale':
@@ -1012,15 +1024,15 @@ class OSK(Gtk.Window):
             if alt_held and ov.get("alt"):
                 self._set_label(b, ov["alt"], "")
                 ctx.remove_class("shift-live")
-            elif shift_held and not alt_held:
+            elif shift_held and not alt_held and self.shift_preview:
                 # Show the glyph the key will actually TYPE (its shifted/capital form) as
-                # the main label, and light up the keys that have an alternate at all.
+                # the main label. No colour change — the swapped glyph IS the cue (user
+                # asked: "dont change color on shift").
                 disp = (ov.get("shifted") or base_shifted
                         or (base_label.upper() if len(base_label) == 1 and base_label.isalpha()
                             and base_label.upper() != base_label else ""))
                 if disp:
                     self._set_label(b, disp, "")
-                    ctx.add_class("shift-live")
                 else:
                     self._set_label(b, ov.get("label", base_label),
                                     ov.get("shifted", base_shifted))
@@ -1051,7 +1063,7 @@ class OSK(Gtk.Window):
     def on_size(self, btn):
         if self._stray_tap():
             return
-        self.size_level = (self.size_level + 1) % 3
+        self.size_level = (self.size_level + 1) % 4
         self.big = self.size_level >= 1
         self._persist_size()                 # written first: the script reads it back
         self.apply_size()
@@ -1171,6 +1183,18 @@ class OSK(Gtk.Window):
             self.grid.set_halign(Gtk.Align.FILL if big else Gtk.Align.CENTER)
             self.grid.set_valign(Gtk.Align.FILL)
             self.grid.set_row_homogeneous(big)
+        else:
+            # Split has no single fill grid, so the two half-grids must be told to fill the
+            # window vertically for the keys' vexpand to bite. Without this a taller
+            # "Bigger" window just adds empty space and the keys stay the same — every size
+            # level then looks identical, only docked higher. row_homogeneous makes each
+            # row grow with the window, so each size level yields genuinely bigger keys.
+            self.grid.set_valign(Gtk.Align.FILL)
+            self.grid.set_vexpand(big)
+            for _g in self._grids:
+                _g.set_valign(Gtk.Align.FILL)
+                _g.set_vexpand(big)
+                _g.set_row_homogeneous(big)
         # In Desktop big mode the resized window + row_homogeneous drive key height, so
         # keep the size_request floor at the normal height (a taller floor would exceed
         # the per-row allocation and distort the grid). Game Mode has no window resize,
@@ -1196,16 +1220,25 @@ class OSK(Gtk.Window):
             handle = (int(self.cfg.get("handle_height", 30)) + 4) if self.unlocked else 0
             fit = (rect["h"] - bar - handle - 8) // self.nrows   # 8 = grid margins
             kh = max(24, min(kh, fit))
+        # Split keys grow in BOTH dimensions per size level: row_homogeneous fills their
+        # height, and we widen them by the same ratio the height grew so they stay in
+        # proportion (without this they went tall-and-thin at 3x/4x). The width scale is
+        # capped so the two clusters can't overrun a narrow panel.
+        cw_scale = 1.0
+        if self.split and big and not GAMEMODE and self.norm_kh:
+            cw_scale = max(1.0, min(2.0, fit / self.norm_kh))
         for g in self._grids:
             for child in g.get_children():
                 child.set_vexpand(big)
                 child.set_valign(Gtk.Align.FILL)
-                # Split keys keep their fixed width (that's what keeps clusters compact);
-                # only the height tracks the fit. Non-split keys stretch (width -1).
-                cw = child.get_size_request().width if self.split else -1
+                if self.split:
+                    base_w = getattr(child, "_base_w", None) or child.get_size_request().width
+                    cw = int(base_w * cw_scale)
+                else:
+                    cw = -1
                 child.set_size_request(cw, kh)
         if self.size_btn:
-            self._set_label(self.size_btn, {0: "⤢", 1: "⤡", 2: "⤢⤡"}[self.size_level], "")
+            self._set_label(self.size_btn, {0: "1×", 1: "2×", 2: "3×", 3: "4×"}[self.size_level], "")
         # Window geometry. Game Mode is a fullscreen gamescope overlay (keys docked at
         # the bottom) — the taller key rows above already grow the strip, no resize/rule.
         if GAMEMODE:
@@ -1536,7 +1569,8 @@ class OSK(Gtk.Window):
         an 800p OLED and a 1920x1200 Legion Go."""
         # Height fraction by size level (0 Normal / 1 Big / 2 Bigger). The `big` param is
         # kept for the signature (big == level>=1) but the level picks the exact fraction.
-        key = ["dock_height_frac", "big_height_frac", "huge_height_frac"][self.size_level]
+        key = ["dock_height_frac", "big_height_frac",
+               "huge_height_frac", "mega_height_frac"][self.size_level]
         frac = float(self.cfg.get(key, DEFAULT_CONFIG[key]))
         h = max(120, min(int(round(out["h"] * frac)), out["h"]))
         return {"x": out["x"], "y": out["y"] + out["h"] - h, "w": out["w"], "h": h}
