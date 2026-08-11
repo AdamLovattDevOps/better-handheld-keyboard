@@ -47,7 +47,11 @@ DEFAULT_CONFIG = {
     # edge clears a ~56px KDE panel (256+488 = 744, panel occupies 744-800).
     "big_geometry": {"x": 0, "y": 256, "w": 1280, "h": 488},
     "big_key_h": 100,              # key-height floor in big mode (drives the Game Mode strip)
-    "start_big": False,            # come up in big mode
+    "start_big": False,            # come up in big mode (DERIVED mirror of size_level>=1)
+    # Keyboard size: a 3-step cycle driven by the size key. 0 Normal → 1 Big → 2 Bigger.
+    # This is the source of truth; start_big is kept in sync as a boolean mirror so the
+    # KWin-script generator and the swap daemon (which only know "big or not") still work.
+    "size_level": 0,
     # KWin rule group that pins our window in Desktop Mode. Big mode rewrites this
     # rule's position/size live so the forced geometry follows the toggle. Must match
     # the UUID the installer writes; "" disables the live geometry change (grid still fills).
@@ -64,6 +68,7 @@ DEFAULT_CONFIG = {
     "position_mode": "bottom",
     "dock_height_frac": 0.42,
     "big_height_frac": 0.55,
+    "huge_height_frac": 0.68,      # the third ("Bigger") size level
     # The move key (kind "move") unlocks the keyboard: KWin stops forcing its position and
     # size, a drag bar appears, and you put it where you want. Pressing it again locks it
     # exactly there — it does not move the window — and saves the spot as `geometry`.
@@ -119,11 +124,70 @@ DEFAULT_CONFIG = {
     "swipe": True,
     "swipe_min_travel": 1.6,      # multiples of key width the finger must travel
     "swipe_min_keys": 3,          # distinct letters it must cross
+    # Named colour preset (see THEMES). Applied under any explicit `theme` keys below,
+    # so a hand-edited theme value always wins over the preset. Change it live from the
+    # tray ("Colour theme") or: handheld-kbd-ctl set color_theme <name>.
+    "color_theme": "midnight",
     "theme": {
         "window_bg": "#161616", "key_bg": "#333333", "key_fg": "#f5f5f5",
         "key_border": "#0d0d0d", "key_active": "#3daee9",
         "mod_on_bg": "#ff8c00", "mod_on_fg": "#000000", "mod_on_border": "#ffe000",
         "special_bg": "#2a2a2a", "special_fg": "#bbccdd", "shifted_fg": "#7fb0ff",
+    },
+}
+
+# Named colour presets, selected by config["color_theme"]. Each defines all 11 base
+# theme keys plus optional extras (shift_live_bg, suggest_bg/fg, handle_bg/fg). The
+# active preset is layered UNDER any explicit user `theme` keys (see load_config), so a
+# preset re-skins everything the user hasn't overridden by hand. "midnight" is byte-
+# identical to DEFAULT_CONFIG["theme"] (plus shift_live_bg) — the original look.
+THEMES = {
+    "midnight": {
+        "window_bg": "#161616", "key_bg": "#333333", "key_fg": "#f5f5f5",
+        "key_border": "#0d0d0d", "key_active": "#3daee9",
+        "mod_on_bg": "#ff8c00", "mod_on_fg": "#000000", "mod_on_border": "#ffe000",
+        "special_bg": "#2a2a2a", "special_fg": "#bbccdd", "shifted_fg": "#7fb0ff",
+        "shift_live_bg": "#26426e",
+    },
+    "light": {
+        "window_bg": "#eceff4", "key_bg": "#ffffff", "key_fg": "#1b1f26",
+        "key_border": "#c3cbd6", "key_active": "#3daee9",
+        "mod_on_bg": "#ff8c00", "mod_on_fg": "#1b1f26", "mod_on_border": "#c86400",
+        "special_bg": "#dfe4ec", "special_fg": "#3b4252", "shifted_fg": "#2a6fb0",
+        "shift_live_bg": "#3daee9", "suggest_bg": "#dfe4ec", "suggest_fg": "#1b1f26",
+        "handle_bg": "#d3d9e2", "handle_fg": "#3b4252",
+    },
+    "contrast": {
+        "window_bg": "#000000", "key_bg": "#111111", "key_fg": "#ffffff",
+        "key_border": "#ffffff", "key_active": "#ffcc00",
+        "mod_on_bg": "#ffcc00", "mod_on_fg": "#000000", "mod_on_border": "#ffffff",
+        "special_bg": "#111111", "special_fg": "#ffffff", "shifted_fg": "#ffcc00",
+        "shift_live_bg": "#ffcc00", "suggest_bg": "#111111", "suggest_fg": "#ffffff",
+        "handle_bg": "#111111", "handle_fg": "#ffffff",
+    },
+    "nord": {
+        "window_bg": "#2e3440", "key_bg": "#3b4252", "key_fg": "#eceff4",
+        "key_border": "#242933", "key_active": "#88c0d0",
+        "mod_on_bg": "#ebcb8b", "mod_on_fg": "#2e3440", "mod_on_border": "#d08770",
+        "special_bg": "#434c5e", "special_fg": "#d8dee9", "shifted_fg": "#81a1c1",
+        "shift_live_bg": "#5e81ac", "suggest_bg": "#3b4252", "suggest_fg": "#eceff4",
+        "handle_bg": "#3b4252", "handle_fg": "#88c0d0",
+    },
+    "solarized": {
+        "window_bg": "#002b36", "key_bg": "#073642", "key_fg": "#eee8d5",
+        "key_border": "#001f27", "key_active": "#268bd2",
+        "mod_on_bg": "#b58900", "mod_on_fg": "#002b36", "mod_on_border": "#cb4b16",
+        "special_bg": "#083f4d", "special_fg": "#93a1a1", "shifted_fg": "#2aa198",
+        "shift_live_bg": "#268bd2", "suggest_bg": "#073642", "suggest_fg": "#eee8d5",
+        "handle_bg": "#073642", "handle_fg": "#268bd2",
+    },
+    "rose": {
+        "window_bg": "#1a1016", "key_bg": "#2b1b25", "key_fg": "#f6e9ef",
+        "key_border": "#100a0e", "key_active": "#e05a8c",
+        "mod_on_bg": "#ffb3c8", "mod_on_fg": "#2b1b25", "mod_on_border": "#e05a8c",
+        "special_bg": "#241019", "special_fg": "#e6c4d4", "shifted_fg": "#d98cff",
+        "shift_live_bg": "#8c3a63", "suggest_bg": "#2b1b25", "suggest_fg": "#f6e9ef",
+        "handle_bg": "#2b1b25", "handle_fg": "#e6a4c4",
     },
 }
 DEFAULT_LAYOUT = {
@@ -146,13 +210,27 @@ def _deep_merge(base, over):
     return out
 
 
+def _apply_theme_preset(merged, raw_theme):
+    """Layer the named colour preset under any explicit user theme keys.
+
+    Precedence (lowest → highest): DEFAULT_CONFIG theme < named preset < user's own
+    `theme` keys. An unknown preset name contributes nothing, so it falls back to just
+    default+user; "midnight" reproduces the original look exactly."""
+    preset = THEMES.get(merged.get("color_theme", "midnight"), {})
+    merged["theme"] = _deep_merge(_deep_merge(DEFAULT_CONFIG["theme"], preset),
+                                  raw_theme or {})
+    return merged
+
+
 def load_config():
     try:
         with open(os.path.join(CFG_DIR, "config.json")) as f:
-            return _deep_merge(DEFAULT_CONFIG, json.load(f))
+            raw = json.load(f)
+        merged = _deep_merge(DEFAULT_CONFIG, raw)
+        return _apply_theme_preset(merged, raw.get("theme", {}))
     except Exception as ex:
         print(f"handheld-kbd: using default config ({ex})", file=sys.stderr)
-        return dict(DEFAULT_CONFIG)
+        return _apply_theme_preset(dict(DEFAULT_CONFIG), {})
 
 
 def apply_super_icon(config, button, kh):
@@ -297,6 +375,7 @@ button {{ background: {t['key_bg']}; color: {t['key_fg']}; border: 1px solid {t[
 button:active {{ background: {t['key_active']}; }}
 button.mod-on {{ background: {t['mod_on_bg']}; color: {t['mod_on_fg']}; font-weight: bold;
                 border: 3px solid {t['mod_on_border']}; }}
+button.shift-live {{ background: {t.get('shift_live_bg', '#26426e')}; color: {t.get('key_fg')}; }}
 button.special {{ background: {t['special_bg']}; color: {t['special_fg']}; }}
 button.hide {{ background: #5a1f1f; color: #ffd9d9; }}
 button.hide:active {{ background: #c0392b; }}
@@ -342,7 +421,15 @@ class OSK(Gtk.Window):
         self.move_btn = None
         self.reported_rect = None      # where KWin last said our window is (free-move)
         self.hide_cb = None            # set by main(); keeps the hide path single-sourced
-        self.big = bool(config.get("start_big", False))
+        # size_level (0 Normal / 1 Big / 2 Bigger) is the source of truth; start_big is a
+        # derived boolean mirror the KWin-script and swap daemon still read. Seed from
+        # size_level, or from legacy start_big if only that is set.
+        self.size_level = int(config.get("size_level", 1 if config.get("start_big") else 0))
+        self.size_level = max(0, min(2, self.size_level))
+        self.big = self.size_level >= 1
+        # Reconcile a stale start_big mirror (e.g. hand-edited config where the two disagree).
+        if bool(config.get("start_big")) != (self.size_level >= 1):
+            self._persist("start_big", self.size_level >= 1)
         # Unlocked = KWin's rule is on Remember, so the user can drag/resize by hand.
         # Always starts locked; an unlocked keyboard that got respawned would drift.
         self.unlocked = False
@@ -918,13 +1005,30 @@ class OSK(Gtk.Window):
         """
         lmap = getattr(self, "lmap", {}) or {}
         alt_held = e.KEY_RIGHTALT in self.mods
+        shift_held = e.KEY_LEFTSHIFT in self.mods or e.KEY_RIGHTSHIFT in self.mods
         for (b, name, base_label, base_shifted) in self.keybtns:
             ov = lmap.get(name, {})
+            ctx = b.get_style_context()
             if alt_held and ov.get("alt"):
                 self._set_label(b, ov["alt"], "")
+                ctx.remove_class("shift-live")
+            elif shift_held and not alt_held:
+                # Show the glyph the key will actually TYPE (its shifted/capital form) as
+                # the main label, and light up the keys that have an alternate at all.
+                disp = (ov.get("shifted") or base_shifted
+                        or (base_label.upper() if len(base_label) == 1 and base_label.isalpha()
+                            and base_label.upper() != base_label else ""))
+                if disp:
+                    self._set_label(b, disp, "")
+                    ctx.add_class("shift-live")
+                else:
+                    self._set_label(b, ov.get("label", base_label),
+                                    ov.get("shifted", base_shifted))
+                    ctx.remove_class("shift-live")
             else:
                 self._set_label(b, ov.get("label", base_label),
                                 ov.get("shifted", base_shifted))
+                ctx.remove_class("shift-live")
 
     def on_locale(self, btn):
         if self._stray_tap():
@@ -947,15 +1051,18 @@ class OSK(Gtk.Window):
     def on_size(self, btn):
         if self._stray_tap():
             return
-        self.big = not self.big
-        self._persist_big()                  # written first: the script reads it back
+        self.size_level = (self.size_level + 1) % 3
+        self.big = self.size_level >= 1
+        self._persist_size()                 # written first: the script reads it back
         self.apply_size()
 
-    def _persist_big(self):
-        """Write the current mode back to config.json's start_big so it survives both
-        the next relogin AND a mid-session respawn by the swap daemon (button-spam churn
-        otherwise drops us back to normal)."""
-        self._persist("start_big", self.big)
+    def _persist_size(self):
+        """Write the current size back to config.json so it survives both the next relogin
+        AND a mid-session respawn by the swap daemon (button-spam churn otherwise drops us
+        back to normal). size_level is the truth; start_big is kept as a boolean mirror for
+        the KWin-script generator and the swap daemon, which only know 'big or not'."""
+        self._persist("size_level", self.size_level)
+        self._persist("start_big", self.size_level >= 1)
 
     def _persist(self, key, val):
         """Merge one key into config.json, preserving the rest; atomic write."""
@@ -1098,7 +1205,7 @@ class OSK(Gtk.Window):
                 cw = child.get_size_request().width if self.split else -1
                 child.set_size_request(cw, kh)
         if self.size_btn:
-            self._set_label(self.size_btn, "⤡" if big else "⤢", "")
+            self._set_label(self.size_btn, {0: "⤢", 1: "⤡", 2: "⤢⤡"}[self.size_level], "")
         # Window geometry. Game Mode is a fullscreen gamescope overlay (keys docked at
         # the bottom) — the taller key rows above already grow the strip, no resize/rule.
         if GAMEMODE:
@@ -1427,8 +1534,10 @@ class OSK(Gtk.Window):
         fraction of the panel. Steam's own on-screen keyboard sits like this, and because
         it's a fraction rather than a pixel count it lands identically on a 1280x800 Deck,
         an 800p OLED and a 1920x1200 Legion Go."""
-        frac = float(self.cfg.get("big_height_frac" if big else "dock_height_frac",
-                                  DEFAULT_CONFIG["big_height_frac" if big else "dock_height_frac"]))
+        # Height fraction by size level (0 Normal / 1 Big / 2 Bigger). The `big` param is
+        # kept for the signature (big == level>=1) but the level picks the exact fraction.
+        key = ["dock_height_frac", "big_height_frac", "huge_height_frac"][self.size_level]
+        frac = float(self.cfg.get(key, DEFAULT_CONFIG[key]))
         h = max(120, min(int(round(out["h"] * frac)), out["h"]))
         return {"x": out["x"], "y": out["y"] + out["h"] - h, "w": out["w"], "h": h}
 
@@ -1476,7 +1585,7 @@ class OSK(Gtk.Window):
         if kc in self.mods: del self.mods[kc]
         else: self.mods[kc] = True
         self._refresh_mods()
-        if kc == e.KEY_RIGHTALT:
+        if kc in (e.KEY_RIGHTALT, e.KEY_LEFTSHIFT, e.KEY_RIGHTSHIFT):
             self._relabel()
 
     def _stray_tap(self):
@@ -1496,9 +1605,10 @@ class OSK(Gtk.Window):
         for m in reversed(mods): self.ui.write(e.EV_KEY, m, 0)
         if mods: self.ui.syn()
         had_alt = e.KEY_RIGHTALT in mods
+        had_shift = e.KEY_LEFTSHIFT in mods or e.KEY_RIGHTSHIFT in mods
         self.mods.clear(); self._refresh_mods()
-        if had_alt:
-            self._relabel()          # the third level is spent; go back to showing the first
+        if had_alt or had_shift:
+            self._relabel()          # the level is spent; go back to showing the first
         self._track(kc, mods)
 
     def dismiss(self):

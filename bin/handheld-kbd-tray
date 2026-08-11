@@ -38,8 +38,8 @@ LAYOUT_DIR = os.path.expanduser("~/.config/handheld-kbd/layouts")
 # file still shows the right state (the keyboard fills these in the same way).
 DEFAULTS = {
     "prediction": True, "predict_learn": True, "swipe": True,
-    "gesture_summon": False, "start_big": False, "mirror": True, "split": False,
-    "layout": "full", "position_mode": "bottom",
+    "gesture_summon": False, "size_level": 0, "mirror": True, "split": False,
+    "layout": "full", "position_mode": "bottom", "color_theme": "midnight",
     "suggestion_count": 3, "gesture_fingers": 2, "super_icon": "windows",
 }
 
@@ -50,7 +50,6 @@ BOOL_SETTINGS = [
     ("swipe",          "Glide (swipe) typing"),
     ("split",          "Split keyboard"),
     ("gesture_summon", "Swipe-up summon"),
-    ("start_big",      "Start in big mode"),
     ("mirror",         "Mirror mode"),
 ]
 
@@ -66,6 +65,10 @@ CHOICE_SETTINGS = [
     ("suggestion_count", "Suggestions",     "int", [(2, "2"), (3, "3"), (4, "4"), (5, "5")]),
     ("gesture_fingers",  "Gesture fingers", "int", [(1, "1 finger"), (2, "2 fingers")]),
     ("super_icon",       "Super key icon",  "str", [("windows", "Windows"), ("arch", "Arch"), ("tux", "Tux")]),
+    ("size_level",       "Keyboard size",   "int", [(0, "Normal"), (1, "Big"), (2, "Bigger")]),
+    ("color_theme",      "Colour theme",    "str", [("midnight", "Midnight"), ("light", "Light"),
+                                                    ("contrast", "High contrast"), ("nord", "Nord"),
+                                                    ("solarized", "Solarized"), ("rose", "Rose")]),
 ]
 
 # The Settings submenu and its subtree. ids: 1-8 are the top-level actions/separators;
@@ -85,7 +88,7 @@ SECTION_BASE = 40          # group i's header id is SECTION_BASE + i
 GROUP_SEP_BASE = 30        # the separator before group i (i>0) is GROUP_SEP_BASE + i
 SETTINGS_GROUPS = [
     ("Typing",              ["prediction", "predict_learn", "@suggestion_count", "swipe"]),
-    ("Layout & appearance", ["@layout", "@super_icon", "split", "start_big", "@position_mode"]),
+    ("Layout & appearance", ["@layout", "@super_icon", "split", "@size_level", "@position_mode", "@color_theme"]),
     ("Summoning & input",   ["mirror", "gesture_summon", "@gesture_fingers"]),
 ]
 

@@ -9,6 +9,22 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.0.19 — Live shift preview, colour themes, bigger size
+
+### Added
+
+- **Holding Shift shows what you'll actually type.** While a Shift key is down every
+  key now displays its capital or symbol form as its main label — no tiny superscript
+  to squint at — and the keys that have an alternate light up, so you can see at a
+  glance exactly which keys change and to what.
+- **Six colour themes.** Pick from **Midnight**, **Light**, **High contrast**,
+  **Nord**, **Solarized** and **Rose** via the tray **Settings ▸ Colour theme**, or
+  `handheld-kbd-ctl set color_theme <name>`. Any `theme` values you've hand-edited in
+  `config.json` still win over the preset.
+- **A third, bigger keyboard size.** The size key now cycles **Normal → Big → Bigger**
+  instead of just toggling two sizes, so you can go taller still on a large panel.
+  Also selectable from the tray **Settings ▸ Keyboard size**.
+
 ## v1.0.18 — Upgrades pick up the aligned arrows
 
 ### Fixed
