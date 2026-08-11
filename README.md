@@ -35,18 +35,25 @@ So I built the keyboard I wanted instead. Here's what it does differently:
 - **AltGr.** Most layouts keep a third of their alphabet behind it — Polish `ą`, French
   `@`, Turkish `î`. Hold it and the keys show what they'll type.
 - **Live Shift preview.** Hold Shift and every key shows the capital or symbol it will
-  actually type as its main label, and the keys that have an alternate light up — so you
-  can see at a glance which keys change.
+  actually type as its main label — no colour change, just the glyph swaps. Toggle it in
+  the tray **Settings ▸ Shift preview**.
 - **Predictive text.** A row of tappable suggestions above the keys. It learns
   what *you* type, and `handheld-kbd-build-dict` adds corpus frequencies so it's
   useful from the first keypress. Tapping a suggestion types it as real keys, so
   it works in any app. Off with `"prediction": false`.
-- **Three sizes.** The ⤢ key cycles Normal → Big → Bigger — each step a taller
-  keyboard with larger keys, for thumbs on a 7-inch panel or precision when you're
-  docked. Cycles live, no relogin (also in the tray **Settings ▸ Keyboard size**).
+- **Four sizes.** The size key cycles **1× → 2× → 3× → 4×** (labelled with the size, no
+  cryptic arrow) — each step a genuinely larger keyboard with bigger keys, for thumbs on a
+  7-inch panel or precision when you're docked. Cycles live, no relogin (also in the tray
+  **Settings ▸ Keyboard size**), and it's kept within the panel so even 4× doesn't clip off
+  the edges.
 - **Colour themes.** Six ready-made palettes — Midnight, Light, High contrast, Nord,
   Solarized and Rose — from the tray **Settings ▸ Colour theme** or
-  `handheld-kbd-ctl set color_theme <name>`. Hand-edited `theme` colours still win.
+  `handheld-kbd-ctl set color_theme <name>`. The whole keyboard recolours — keys, labels
+  and the predictive-text bar — the super-key logo tints to match, and the labels stay
+  legible whatever your desktop GTK theme is.
+- **Custom super-key icon.** Put a **Windows**, **Arch** or **Tux** logo on the meta key —
+  tray **Settings ▸ Super key icon** or `handheld-kbd-ctl super-icon <name>`. It tints to
+  the current theme, so it stays visible on the light themes too.
 - **Split keyboard.** Turn on `split` (tray **Settings ▸ Split keyboard**, or
   `handheld-kbd-ctl set split true`) and each row's two halves slide out to the
   left and right edges with a clear gap down the middle — thumb-typing while you
@@ -236,8 +243,9 @@ instead — that works here too, and is probably what you want.
 ## Configure
 
 Everything's in `~/.config/handheld-kbd/config.json` — `opacity`, `layout`,
-`locale`, `theme`, key sizes, optional `hotkey`. Edits apply next time the
-keyboard restarts. Layouts and locales sit beside it as plain JSON.
+`locale`, `color_theme`, `size_level`, `super_icon`, `split`, per-key `theme`
+colours, key dimensions, optional `hotkey`. Edits apply next time the keyboard
+restarts. Layouts and locales sit beside it as plain JSON.
 
 ## Uninstall
 
