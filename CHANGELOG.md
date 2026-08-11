@@ -30,7 +30,9 @@ The heading must be `## v<version> — <title>` and the version must match the t
 - The colour theme now reaches the **keys** even when an older `config.json` carries a
   full default `theme` block (which previously pinned the keys grey).
 - In **split** mode the size steps now actually resize the keys instead of just docking
-  the same-size keyboard higher up the screen.
+  the same-size keyboard higher up the screen, and grow in both width and height so they
+  stay in proportion. The sizes are kept within the panel so 3× and 4× don't clip off
+  the edges.
 
 ## v1.0.18 — Upgrades pick up the aligned arrows
 

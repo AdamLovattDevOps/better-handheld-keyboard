@@ -68,10 +68,12 @@ DEFAULT_CONFIG = {
     "position_mode": "bottom",
     # Keyboard-size cycle (the size key): four steps, 1x-4x, each a larger fraction of
     # the panel height. The size key is labelled 1x/2x/3x/4x (no arrow glyphs).
+    # Kept modest so even 4x fits a handheld panel without the split clusters or the top
+    # rows being clipped off the edges.
     "dock_height_frac": 0.42,      # 1x
-    "big_height_frac": 0.55,       # 2x
-    "huge_height_frac": 0.68,      # 3x
-    "mega_height_frac": 0.82,      # 4x
+    "big_height_frac": 0.51,       # 2x
+    "huge_height_frac": 0.59,      # 3x
+    "mega_height_frac": 0.67,      # 4x
     # The move key (kind "move") unlocks the keyboard: KWin stops forcing its position and
     # size, a drag bar appears, and you put it where you want. Pressing it again locks it
     # exactly there — it does not move the window — and saves the spot as `geometry`.
@@ -1226,7 +1228,7 @@ class OSK(Gtk.Window):
         # capped so the two clusters can't overrun a narrow panel.
         cw_scale = 1.0
         if self.split and big and not GAMEMODE and self.norm_kh:
-            cw_scale = max(1.0, min(2.0, fit / self.norm_kh))
+            cw_scale = max(1.0, min(1.55, fit / self.norm_kh))
         for g in self._grids:
             for child in g.get_children():
                 child.set_vexpand(big)
