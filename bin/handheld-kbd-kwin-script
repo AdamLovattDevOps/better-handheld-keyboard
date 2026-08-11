@@ -62,7 +62,11 @@ try:
 except Exception:
     d = {}
 g = d.get("geometry") or {}
-frac = d.get("big_height_frac", 0.55) if d.get("start_big") else d.get("dock_height_frac", 0.42)
+try:
+    lvl = int(d.get("size_level", 1 if d.get("start_big") else 0))
+except Exception:
+    lvl = 1 if d.get("start_big") else 0
+frac = [d.get("dock_height_frac", 0.42), d.get("big_height_frac", 0.55), d.get("huge_height_frac", 0.68), d.get("mega_height_frac", 0.82)][max(0, min(3, lvl))]
 try:
     frac = float(frac)
 except Exception:

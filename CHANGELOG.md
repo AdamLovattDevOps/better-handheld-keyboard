@@ -9,6 +9,36 @@ git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3
 
 The heading must be `## v<version> — <title>` and the version must match the tag.
 
+## v1.0.19 — Live shift preview, colour themes, 1×–4× sizes
+
+### Added
+
+- **Holding Shift shows what you'll actually type.** While a Shift key is down every
+  key displays its capital or symbol form as its main label — no tiny superscript to
+  squint at. It swaps the glyph only (no colour change). Toggle it from the tray
+  **Settings ▸ Shift preview**.
+- **Six colour themes for the whole keyboard.** Pick **Midnight**, **Light**,
+  **High contrast**, **Nord**, **Solarized** or **Rose** from the tray **Settings ▸
+  Colour theme** (or `handheld-kbd-ctl set color_theme <name>`). The chosen theme
+  recolours the keys, window and the predictive-text bar together.
+- **Four keyboard sizes, 1×–4×.** The size key now cycles four clearly-labelled steps
+  **1× → 2× → 3× → 4×** (was a two-way toggle with an arrow glyph), each a genuinely
+  larger keyboard. Also selectable from the tray **Settings ▸ Keyboard size**.
+
+### Fixed
+
+- The colour theme now reaches the **keys** even when an older `config.json` carries a
+  full default `theme` block (which previously pinned the keys grey).
+- In **split** mode the size steps now actually resize the keys instead of just docking
+  the same-size keyboard higher up the screen, and grow in both width and height so they
+  stay in proportion. The sizes are kept within the panel so 3× and 4× don't clip off
+  the edges.
+- Theme text is now legible on any GTK desktop theme — the label colour is forced so a
+  chosen theme's foreground wins over Breeze (which was pinning labels grey, worst on the
+  Light theme).
+- The super-key logo tints to the theme's text colour, so it stays visible on the light
+  themes instead of being white-on-white.
+
 ## v1.0.18 — Upgrades pick up the aligned arrows
 
 ### Fixed

@@ -34,13 +34,19 @@ So I built the keyboard I wanted instead. Here's what it does differently:
   `й` and `ก` are drawn where they actually are. `handheld-kbd-locales` picks which.
 - **AltGr.** Most layouts keep a third of their alphabet behind it — Polish `ą`, French
   `@`, Turkish `î`. Hold it and the keys show what they'll type.
+- **Live Shift preview.** Hold Shift and every key shows the capital or symbol it will
+  actually type as its main label, and the keys that have an alternate light up — so you
+  can see at a glance which keys change.
 - **Predictive text.** A row of tappable suggestions above the keys. It learns
   what *you* type, and `handheld-kbd-build-dict` adds corpus frequencies so it's
   useful from the first keypress. Tapping a suggestion types it as real keys, so
   it works in any app. Off with `"prediction": false`.
-- **Two sizes.** The ⤢ key toggles between the normal keyboard and a taller one
-  with bigger keys — thumbs on a 7-inch panel, or precision when you're docked.
-  Toggles live, no relogin.
+- **Three sizes.** The ⤢ key cycles Normal → Big → Bigger — each step a taller
+  keyboard with larger keys, for thumbs on a 7-inch panel or precision when you're
+  docked. Cycles live, no relogin (also in the tray **Settings ▸ Keyboard size**).
+- **Colour themes.** Six ready-made palettes — Midnight, Light, High contrast, Nord,
+  Solarized and Rose — from the tray **Settings ▸ Colour theme** or
+  `handheld-kbd-ctl set color_theme <name>`. Hand-edited `theme` colours still win.
 - **Split keyboard.** Turn on `split` (tray **Settings ▸ Split keyboard**, or
   `handheld-kbd-ctl set split true`) and each row's two halves slide out to the
   left and right edges with a clear gap down the middle — thumb-typing while you
