@@ -258,6 +258,12 @@ yourself if you want the learned predictions gone too.
 KDE Plasma 6 (Wayland) · `python3`, `python-gobject` (GTK 3), `python-evdev`.
 The installer adds you to the `input` group.
 
+## Support
+
+If this keyboard made your handheld more usable, you can [buy me a coffee on
+Ko-fi](https://ko-fi.com/adamlovatttdevops). It runs entirely on white Monster
+and Claude tokens.
+
 ## License
 
 MIT — see [LICENSE](LICENSE). It's all local; nothing leaves your device.
